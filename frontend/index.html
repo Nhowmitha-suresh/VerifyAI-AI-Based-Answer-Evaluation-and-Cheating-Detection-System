@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>verifAI — Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="brand">
+      <div class="logo">vA</div>
+      <div>
+        <h1>verifAI</h1>
+        <div class="tag">Every answer, every second, AI-evaluated.</div>
+      </div>
+    </div>
+    <nav>
+      <button class="tab active">Interview Room</button>
+      <button class="tab">Live Monitor</button>
+      <button class="tab">Feedback</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="app-shell">
+      <!-- Home / Orb -->
+      <section class="home-pane pane" style="display:block">
+        <div class="center">
+          <div class="orb-wrap">
+            <div id="orb" class="orb idle"></div>
+            <div id="status" class="status">Tap the mic to begin</div>
+          </div>
+
+          <div class="controls-row">
+            <div class="upload-row">
+              <button id="uploadBtn" class="icon">📷</button>
+              <button id="pasteBtn" class="icon">📋</button>
+              <div class="hint">Upload screenshot or paste text</div>
+            </div>
+
+            <button id="micBtn" class="mic-btn">
+              <div class="mic-core"></div>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analysis -->
+      <section class="analysis-pane pane" style="display:none">
+        <div class="analysis-grid">
+          <div class="analysis-main card">
+            <div class="meta">Source: <span id="sourceType">Voice</span></div>
+            <div id="analyzeText" class="analyze-text">(analysis will appear here)</div>
+          </div>
+          <aside class="analysis-side card">
+            <div class="truth-panel">
+              <div class="truth-label">Truth Score</div>
+              <div id="truthScore" class="truth-score">--%</div>
+              <div id="tags" class="tags"></div>
+            </div>
+            <div class="explain card" id="explain">AI explanation will appear here.</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- Result -->
+      <section class="result-pane pane" style="display:none">
+        <div class="result-card card">
+          <div class="result-hero">
+            <div id="resultScore" class="result-score">--%</div>
+            <div id="resultTags" class="result-tags"></div>
+          </div>
+          <div id="evidence" class="evidence"></div>
+          <div class="result-actions"><button id="shareBtn" class="btn">Share</button><button id="saveBtn" class="btn ghost">Save</button></div>
+        </div>
+      </section>
+
+      <!-- History -->
+      <section class="history-pane pane" style="display:none">
+        <div class="history card">
+          <h3>History</h3>
+          <div id="historyList" class="history-list"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">Design tokens: dark theme, neon accents. Fonts: Syne, Inter/DM Sans.</div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

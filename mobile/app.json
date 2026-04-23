@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "VerifyAI",
+    "slug": "verifyai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0B0B0F"
+    },
+    "assetBundlePatterns": ["**/*"]
+  }
+}

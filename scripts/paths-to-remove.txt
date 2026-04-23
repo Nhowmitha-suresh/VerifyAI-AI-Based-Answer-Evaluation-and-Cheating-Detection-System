@@ -1,0 +1,5 @@
+backend/.venv
+ffmpeg
+audio_uploads
+mobile/.expo
+mobile/node_modules

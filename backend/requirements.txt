@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+numpy
+opencv-python
+python-multipart
+# openai-whisper  # optional: heavy dependency (requires PyTorch). Install manually if you need server transcription.
