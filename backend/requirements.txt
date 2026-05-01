@@ -3,4 +3,6 @@ uvicorn
 numpy
 opencv-python
 python-multipart
+# PDF generation library used for exporting questions
+reportlab
 # openai-whisper  # optional: heavy dependency (requires PyTorch). Install manually if you need server transcription.

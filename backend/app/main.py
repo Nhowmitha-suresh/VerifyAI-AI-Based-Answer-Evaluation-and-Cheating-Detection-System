@@ -1,9 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import pathlib
 from pydantic import BaseModel
+import logging
+import asyncio
 from app.nlp import score_answer
 import cv2
 import numpy as np
@@ -11,8 +13,49 @@ import os
 import json
 import re
 from datetime import datetime
+import io
+import zipfile
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import Query
+from uuid import uuid4
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    REPORTLAB_AVAILABLE = True
+except Exception:
+    REPORTLAB_AVAILABLE = False
 
 app = FastAPI(title="verifAI - Starter API")
+
+# basic logging
+logger = logging.getLogger("verifiX")
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+# WebSocket processing lock (per-server default, individual connections will use their own lock)
+ws_processing_lock = asyncio.Lock()
+
+# Simple in-memory session store (for demo; replace with persistent store in prod)
+_sessions = {}
+
+
+@app.post('/session/start')
+def session_start():
+    sid = uuid4().hex
+    _sessions[sid] = {'created': datetime.utcnow().isoformat(), 'alerts': [], 'last_seen': None, 'processing': False}
+    logger.info(f"session started {sid}")
+    return {'session_id': sid}
+
+
+@app.post('/session/end')
+def session_end(sid: str = Query(None)):
+    if sid and sid in _sessions:
+        _sessions.pop(sid, None)
+        logger.info(f"session ended {sid}")
+    return {'status': 'ok'}
 
 # Allow local frontend dev servers to talk to the API
 origins = [
@@ -78,91 +121,140 @@ def health():
 
 @app.post("/nlp/score")
 def nlp_score(payload: QAPayload):
-    score, details = score_answer(payload.question, payload.answer, payload.keywords)
-    return {"score": score, "details": details}
+    try:
+        score, details = score_answer(payload.question, payload.answer, payload.keywords)
+        return {"score": score, "details": details}
+    except Exception as e:
+        logger.exception('nlp_score error')
+        return JSONResponse(status_code=500, content={"error": "nlp scoring failed", "detail": str(e)})
 
 @app.post("/detect-face")
 async def detect_face(file: UploadFile = File(...)):
-    content = await file.read()
-    nparr = np.frombuffer(content, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        return {"faces": 0, "error": "could not decode image"}
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    return {"faces": int(len(faces))}
+    try:
+        content = await file.read()
+        nparr = np.frombuffer(content, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            return JSONResponse(status_code=400, content={"faces": 0, "error": "could not decode image"})
+        # downscale image for faster detection while preserving aspect
+        h, w = img.shape[:2]
+        max_dim = 800
+        if max(h, w) > max_dim:
+            scale = max_dim / float(max(h, w))
+            img = cv2.resize(img, (int(w*scale), int(h*scale)))
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        return {"faces": int(len(faces))}
+    except Exception as e:
+        logger.exception('detect_face error')
+        return JSONResponse(status_code=500, content={"error": "face detection failed", "detail": str(e)})
 
 
 @app.websocket("/ws/stream")
-async def websocket_stream(websocket: WebSocket):
+async def websocket_stream(websocket: WebSocket, session: str = Query(None)):
     await websocket.accept()
+    sid = session
+    if not sid or sid not in _sessions:
+        try:
+            await websocket.send_json({'error': 'invalid_session'})
+        except Exception:
+            pass
+        try:
+            await websocket.close()
+        except Exception:
+            pass
+        return
     frames = 0
+    # prepare detector once per connection
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    conn_lock = asyncio.Lock()
     try:
-        # Prepare face detector once
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
         while True:
             # Expect binary frames (JPEG/PNG bytes) from the client
-            data = await websocket.receive_bytes()
-            frames += 1
-            # decode image
             try:
-                nparr = np.frombuffer(data, np.uint8)
-                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            except Exception:
-                img = None
+                data = await websocket.receive_bytes()
+            except WebSocketDisconnect:
+                logger.info('WebSocket client disconnected')
+                return
+            frames += 1
             alerts = []
             integrity = 100
             faces_count = 0
-            if img is None:
-                alerts.append('invalid_frame')
-                integrity -= 50
-            else:
-                try:
-                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-                    faces_count = int(len(faces))
-                    if faces_count == 0:
-                        alerts.append('no_face_detected')
-                        integrity -= 60
-                    elif faces_count > 1:
-                        alerts.append('multiple_faces')
-                        integrity -= 40
-                    # brightness check
-                    mean_brightness = float(np.mean(gray))
-                    if mean_brightness < 40:
-                        alerts.append('low_light')
-                        integrity -= 20
-                except Exception as e:
-                    alerts.append('detection_error')
-                    integrity -= 30
 
-            # clamp integrity
-            integrity = max(0, min(100, integrity))
-            # log occasionally
-            if frames % 100 == 0:
-                print(f"WS frames={frames} faces={faces_count} alerts={alerts} integrity={integrity}")
-            # If critical alerts, save flagged frame to disk asynchronously (best-effort)
-            if img is not None and ( 'multiple_faces' in alerts or 'no_face_detected' in alerts or 'low_light' in alerts ):
+            # If another frame is still being processed, skip heavy processing to keep up
+            if conn_lock.locked():
+                # minimal response to keep client informed
+                await websocket.send_json({"session": sid, "frame": frames, "alerts": ['processing_busy'], "integrity": integrity, "faces": faces_count})
+                continue
+
+            async with conn_lock:
+                # decode and downscale for performance
                 try:
-                    # save to flagged_frames directory
-                    root = os.path.join(os.getcwd(), 'flagged_frames')
-                    os.makedirs(root, exist_ok=True)
-                    ts = datetime.utcnow().strftime('%Y%m%dT%H%M%S%f')
-                    fname = f'ws_flagged_{ts}.jpg'
-                    cv2.imwrite(os.path.join(root, fname), img)
+                    nparr = np.frombuffer(data, np.uint8)
+                    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 except Exception:
-                    pass
+                    img = None
 
-            # send back an alerts payload
-            await websocket.send_json({"frame": frames, "alerts": alerts, "integrity": integrity, "faces": faces_count})
-    except WebSocketDisconnect:
-        print("WebSocket client disconnected")
+                if img is None:
+                    alerts.append('invalid_frame')
+                    integrity -= 50
+                else:
+                    try:
+                        # downscale for detection speed
+                        h, w = img.shape[:2]
+                        max_dim = 800
+                        if max(h, w) > max_dim:
+                            scale = max_dim / float(max(h, w))
+                            img = cv2.resize(img, (int(w*scale), int(h*scale)))
+                        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+                        faces_count = int(len(faces))
+                        if faces_count == 0:
+                            alerts.append('no_face_detected')
+                            integrity -= 60
+                        elif faces_count > 1:
+                            alerts.append('multiple_faces')
+                            integrity -= 40
+                        # brightness check
+                        mean_brightness = float(np.mean(gray))
+                        if mean_brightness < 40:
+                            alerts.append('low_light')
+                            integrity -= 20
+                    except Exception as e:
+                        logger.exception('ws detection error')
+                        alerts.append('detection_error')
+                        integrity -= 30
+
+                # clamp integrity
+                integrity = max(0, min(100, integrity))
+                # occasional log
+                if frames % 100 == 0:
+                    logger.info(f"WS frames={frames} faces={faces_count} alerts={alerts} integrity={integrity}")
+
+                # If critical alerts, save flagged frame to disk asynchronously (best-effort)
+                if img is not None and ( 'multiple_faces' in alerts or 'no_face_detected' in alerts or 'low_light' in alerts ):
+                    try:
+                        root = os.path.join(os.getcwd(), 'flagged_frames')
+                        os.makedirs(root, exist_ok=True)
+                        ts = datetime.utcnow().strftime('%Y%m%dT%H%M%S%f')
+                        fname = f'ws_flagged_{ts}.jpg'
+                        cv2.imwrite(os.path.join(root, fname), img)
+                    except Exception:
+                        logger.exception('failed to save flagged frame')
+
+                await websocket.send_json({"session": sid, "frame": frames, "alerts": alerts, "integrity": integrity, "faces": faces_count})
+    except Exception:
+        logger.exception('websocket_stream unexpected error')
+        try:
+            await websocket.close()
+        except Exception:
+            pass
         return
 
 
 @app.post('/flagged-frame')
-async def flagged_frame(file: UploadFile = File(...), reasons: str = None, integrity: str = '0'):
+async def flagged_frame(file: UploadFile = File(...), reasons: str = None, integrity: str = '0', session: str = Query(None)):
     """Receive flagged frames (image) from frontend for logging / review."""
     root = os.path.join(os.getcwd(), 'flagged_frames')
     os.makedirs(root, exist_ok=True)
@@ -170,9 +262,13 @@ async def flagged_frame(file: UploadFile = File(...), reasons: str = None, integ
     filename = f'flagged_{ts}.jpg'
     fpath = os.path.join(root, filename)
     content = await file.read()
-    with open(fpath, 'wb') as fh:
-        fh.write(content)
-    meta = {'file': filename, 'reasons': None, 'integrity': integrity}
+    try:
+        with open(fpath, 'wb') as fh:
+            fh.write(content)
+    except Exception as e:
+        logger.exception('failed to save flagged frame')
+        return JSONResponse(status_code=500, content={'error':'failed to save file', 'detail': str(e)})
+    meta = {'file': filename, 'reasons': None, 'integrity': integrity, 'session': session}
     try:
         if reasons:
             meta['reasons'] = json.loads(reasons)
@@ -197,17 +293,18 @@ async def audio_transcribe(file: UploadFile = File(...)):
     with open(fpath, 'wb') as fh:
         fh.write(content)
     # Try to import whisper and transcribe; if unavailable, return file path for client-side ASR
-    print(f"Received audio file for transcription: {fpath}")
+    logger.info(f"Received audio file for transcription: {fpath}")
     try:
         import whisper
         model = whisper.load_model('small')
         result = model.transcribe(fpath)
         transcript = result.get('text','')
-        print(f"Whisper transcript: {transcript}")
+        logger.info(f"Whisper transcript length={len(transcript)}")
         return {'status': 'ok', 'transcript': transcript, 'language': result.get('language',''), 'model': 'whisper-small'}
     except Exception as e:
-        print(f"Whisper transcription failed or not available: {e}")
-        return {'status': 'no-model', 'message': 'Whisper not available on server or error during transcription', 'error': str(e), 'path': fpath}
+        # Whisper not available or failed — return 503 so clients can handle gracefully
+        logger.warning(f"Whisper transcription failed or not available: {e}")
+        return JSONResponse(status_code=503, content={'status': 'no-model', 'message': 'Whisper not available on server or error during transcription', 'error': str(e), 'path': fpath})
 
 
 class AuthEvaluatePayload(BaseModel):
@@ -262,4 +359,335 @@ def auth_evaluate(payload: AuthEvaluatePayload):
         'filler_ratio': round(filler_ratio,3),
         'variability': round(variability,3)
     }
-    return {'authenticity_score': round(score,2), 'details': details}
+    try:
+        return {'authenticity_score': round(score,2), 'details': details}
+    except Exception as e:
+        logger.exception('auth_evaluate error')
+        return JSONResponse(status_code=500, content={'error':'auth evaluation failed','detail':str(e)})
+
+
+class GenerateQuestionsPayload(BaseModel):
+    resume_text: str = ""
+
+
+def _extract_resume_sections(text: str):
+    """Attempt to extract Skills, Projects, Technologies, Coursework from free-form resume text.
+    This uses simple header matching and fallback keyword extraction. It's intentionally conservative
+    to avoid inventing facts when the resume is missing or ambiguous.
+    Returns a dict with lists for each section.
+    """
+    sections = {'skills': [], 'projects': [], 'technologies': [], 'coursework': []}
+    if not text or not text.strip():
+        return sections
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    cur_section = None
+    for ln in lines:
+        low = ln.lower()
+        if low.startswith('skills') or low.startswith('skill:') or low == 'skills:':
+            cur_section = 'skills'
+            # strip header text
+            rest = ln.split(':',1)[1].strip() if ':' in ln else ''
+            if rest:
+                sections['skills'] += [s.strip() for s in re.split('[,;|/]', rest) if s.strip()]
+            continue
+        if low.startswith('projects') or low.startswith('project:'):
+            cur_section = 'projects'
+            rest = ln.split(':',1)[1].strip() if ':' in ln else ''
+            if rest:
+                sections['projects'].append(rest)
+            continue
+        if low.startswith('technologies') or low.startswith('technology') or low.startswith('tech:'):
+            cur_section = 'technologies'
+            rest = ln.split(':',1)[1].strip() if ':' in ln else ''
+            if rest:
+                sections['technologies'] += [s.strip() for s in re.split('[,;|/]', rest) if s.strip()]
+            continue
+        if low.startswith('coursework') or low.startswith('courses'):
+            cur_section = 'coursework'
+            rest = ln.split(':',1)[1].strip() if ':' in ln else ''
+            if rest:
+                sections['coursework'] += [s.strip() for s in re.split('[,;|/]', rest) if s.strip()]
+            continue
+
+        # If current section is one of the known headers, append lines heuristically
+        if cur_section == 'skills':
+            sections['skills'] += [s.strip() for s in re.split('[,;|/]', ln) if s.strip()]
+        elif cur_section == 'projects':
+            sections['projects'].append(ln)
+        elif cur_section == 'technologies':
+            sections['technologies'] += [s.strip() for s in re.split('[,;|/]', ln) if s.strip()]
+        elif cur_section == 'coursework':
+            sections['coursework'] += [s.strip() for s in re.split('[,;|/]', ln) if s.strip()]
+
+    # As a last resort, try to harvest some capitalized tokens as skills/technologies (conservative)
+    if not sections['skills'] and not sections['technologies']:
+        tokens = re.findall(r"\b[A-Z][A-Za-z0-9+#.+-]{1,20}\b", text)
+        # filter common English words
+        common = {'The','And','For','With','From','In','On','Or','To','By','Of'}
+        tokens = [t for t in tokens if t not in common]
+        sections['technologies'] = list(dict.fromkeys(tokens))[:10]
+
+    return sections
+
+
+def _build_resume_questions(sections: dict, max_q: int = 5):
+    """Generate up to `max_q` resume-focused questions based only on extracted sections.
+    Avoids inventing any facts — if a section is empty it is skipped.
+    """
+    qlist = []
+    if sections.get('projects'):
+        for proj in sections['projects'][:2]:
+            qlist.append({
+                'question': f"Describe the architecture and key design decisions you made for the project: '{proj}'.",
+                'difficulty': 'Medium',
+                'expected_key_points': [
+                    'High-level architecture (components, data flow)',
+                    'Choices for protocols, storage, and scalability',
+                    'Tradeoffs and lessons learned',
+                ]
+            })
+    if sections.get('skills'):
+        for skill in sections['skills'][:2]:
+            qlist.append({
+                'question': f"How have you applied the skill '{skill}' in a production or project setting? Provide concrete examples.",
+                'difficulty': 'Medium',
+                'expected_key_points': [
+                    'Specific scenario or project where skill was used',
+                    'Measured outcomes or improvements',
+                    'Tools, libraries, or frameworks used',
+                ]
+            })
+    if sections.get('technologies') and len(qlist) < max_q:
+        for tech in sections['technologies'][:max(0, max_q - len(qlist))]:
+            qlist.append({
+                'question': f"Discuss trade-offs when using '{tech}' compared to alternatives for similar tasks.",
+                'difficulty': 'Hard' if any(c.isupper() for c in tech) else 'Medium',
+                'expected_key_points': [
+                    'Strengths and limitations of the technology',
+                    'Performance, scalability, and cost considerations',
+                    'Relevant alternatives and comparison criteria',
+                ]
+            })
+    if sections.get('coursework') and len(qlist) < max_q:
+        for course in sections['coursework'][:max(0, max_q - len(qlist))]:
+            qlist.append({
+                'question': f"From your coursework '{course}', explain one concept you found most valuable and how you applied it.",
+                'difficulty': 'Medium',
+                'expected_key_points': [
+                    'Clear explanation of the concept',
+                    'Practical application or example',
+                    'Limitations or extensions',
+                ]
+            })
+
+    # Trim to max_q and return
+    return qlist[:max_q]
+
+
+def _cn_question_bank():
+    # Deterministic list of Computer Networks questions (>=10)
+    bank = [
+        {'question': "Describe the seven layers of the OSI model and give one protocol or device example per layer.", 'difficulty': 'Medium',
+         'expected_key_points': ['Names and order of layers', 'Examples (Ethernet, IP, TCP, HTTP)', 'Encapsulation concept']},
+        {'question': "Map the OSI model to the TCP/IP model and explain practical reasons for the Internet's layering.", 'difficulty': 'Medium',
+         'expected_key_points': ['Mapping (Application, Transport, Internet, Link)', 'Simplicity and adoption reasons']},
+        {'question': "Explain the TCP three-way handshake and the role of sequence and acknowledgement numbers.", 'difficulty': 'Easy',
+         'expected_key_points': ['SYN, SYN-ACK, ACK steps', 'ISN purpose', 'Teardown (FIN/ACK) and RST']},
+        {'question': "Compare TCP congestion control phases: slow start, congestion avoidance, fast retransmit, and fast recovery.", 'difficulty': 'Hard',
+         'expected_key_points': ['cwnd and ssthresh behavior', 'Exponential vs linear growth', 'Duplicate ACKs and fast retransmit']},
+        {'question': "When would you choose UDP over TCP? Give three real-world use cases and explain app-level reliability strategies.", 'difficulty': 'Easy',
+         'expected_key_points': ['Connectionless nature', 'Use cases: DNS, VoIP, gaming', 'Application-layer reliability (FEC, seq nums)']},
+        {'question': "Walk through the DNS resolution process including iterative vs recursive queries and TTL implications.", 'difficulty': 'Medium',
+         'expected_key_points': ['Resolver roles', 'Root/TLD/Authoritative servers', 'Caching and TTL']},
+        {'question': "Explain HTTP/1.1 persistent connections vs HTTP/2 multiplexing and why HTTP/2 improves performance.", 'difficulty': 'Medium',
+         'expected_key_points': ['Keep-alive, head-of-line blocking', 'HTTP/2 frames and multiplexing', 'TLS interactions']},
+        {'question': "Describe NAT types (SNAT, DNAT, PAT) and how NAT impacts protocols embedding IP/port information.", 'difficulty': 'Medium',
+         'expected_key_points': ['Source/Destination NAT definitions', 'Port mapping', 'NAT traversal (STUN/TURN)']},
+        {'question': "Compare distance-vector and link-state routing protocols (e.g., RIP vs OSPF). Why does link-state often converge faster?", 'difficulty': 'Hard',
+         'expected_key_points': ['Periodic updates vs LSDB flooding', 'SPF algorithm', 'Convergence and scaling tradeoffs']},
+        {'question': "Explain BGP path selection basics and common mitigations for prefix hijacks.", 'difficulty': 'Hard',
+         'expected_key_points': ['Local-pref, AS-PATH, MED, origin', 'RPKI and prefix filtering']},
+        {'question': "Given a packet capture showing TCP retransmits and duplicate ACKs, how would you determine the root cause?", 'difficulty': 'Hard',
+         'expected_key_points': ['Inspect seq/ack, RTT, window sizes', 'Use traceroute/mtr, check interface counters', 'Differentiate sender/receiver/network faults']},
+        {'question': "A REST service across datacenters shows high tail latency—list network-level diagnostic steps you would take.", 'difficulty': 'Medium',
+         'expected_key_points': ['Measure p95/p99 latency', 'Check packet loss, retransmits, MTU/PMTU', 'Load balancer and connection reuse checks']},
+    ]
+    return bank
+
+
+def _os_question_bank():
+    bank = [
+        {'question': "Explain differences between a process and a thread and give an example where processes are preferred.", 'difficulty': 'Easy',
+         'expected_key_points': ['Separate address spaces vs shared memory', 'IPC costs', 'Failure isolation']},
+        {'question': "Describe the fork->exec model and how zombies and orphans are created and handled.", 'difficulty': 'Medium',
+         'expected_key_points': ['fork duplicates, exec replaces', 'wait/waitpid to reap children', 'reparenting to init/systemd']},
+        {'question': "Compare user-level threads and kernel-level threads and implications for blocking syscalls.", 'difficulty': 'Medium',
+         'expected_key_points': ['User-level fast switches vs kernel scheduling', 'Blocking syscall behavior', 'M:N vs 1:1 models']},
+        {'question': "Compare Round-Robin, SJF, Priority, and CFS scheduling in terms of fairness and starvation risk.", 'difficulty': 'Hard',
+         'expected_key_points': ['Mechanics of each algorithm', 'Starvation and aging', 'CFS virtual runtime concept']},
+        {'question': "List the four Coffman deadlock conditions and one practical prevention or recovery strategy.", 'difficulty': 'Hard',
+         'expected_key_points': ['Mutual exclusion, hold-and-wait, no preemption, circular wait', 'Resource ordering or detection+recovery']},
+        {'question': "Differentiate mutex, semaphore, and condition variable and give a use-case for each.", 'difficulty': 'Medium',
+         'expected_key_points': ['Mutual exclusion, counting semaphores, cond-var wait/notify', 'Examples: critical section, resource pool, producer/consumer']},
+        {'question': "Explain virtual memory translation with multi-level page tables and the role of the TLB.", 'difficulty': 'Hard',
+         'expected_key_points': ['Page table walk, levels', 'TLB caching and miss cost', 'Large pages and TLB shootdown']},
+        {'question': "Compare paging and segmentation; what fragmentation types do they suffer from?", 'difficulty': 'Medium',
+         'expected_key_points': ['Paging eliminates external frag but has internal frag', 'Segmentation supports logical division and may have external frag']},
+        {'question': "Describe the steps the OS takes on a page fault, including victim selection when no free frames exist.", 'difficulty': 'Medium',
+         'expected_key_points': ['Trap to kernel, validate, load from swap/disk', 'Choose victim, writeback if dirty, update page tables']},
+        {'question': "Explain common page replacement algorithms (LRU, Clock, FIFO) and how OS approximates LRU efficiently.", 'difficulty': 'Hard',
+         'expected_key_points': ['LRU optimal but expensive, Clock as efficient approximation', 'Working set and thrashing']},
+        {'question': "Describe kernel and user-space allocators (buddy, slab, malloc) and how they reduce fragmentation.", 'difficulty': 'Hard',
+         'expected_key_points': ['Buddy coalescing, slab caches for small objects, malloc bins', 'Per-CPU caches and locking']},
+        {'question': "A server is thrashing with high page fault rates—how would you diagnose and mitigate the issue?", 'difficulty': 'Hard',
+         'expected_key_points': ['Collect vmstat/top, identify working set', 'Increase RAM, tune swappiness, find memory leaks']},
+    ]
+    return bank
+
+
+def _render_pdf(payload: dict) -> bytes:
+    """Render a clean PDF from the questions payload. Returns PDF bytes.
+    Uses reportlab when available; otherwise raises RuntimeError.
+    """
+    if not REPORTLAB_AVAILABLE:
+        raise RuntimeError('reportlab not installed')
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    width, height = letter
+    margin = 50
+    y = height - margin
+    line_height = 14
+
+    def newline(n=1):
+        nonlocal y
+        y -= line_height * n
+        if y < margin:
+            c.showPage()
+            y = height - margin
+
+    # Title
+    c.setFont('Helvetica-Bold', 16)
+    c.drawString(margin, y, 'Interview Questions')
+    newline(2)
+
+    # Helper to render a section
+    def render_section(title, items):
+        nonlocal y
+        c.setFont('Helvetica-Bold', 12)
+        c.drawString(margin, y, title)
+        newline(1)
+        c.setFont('Helvetica', 10)
+        for idx, it in enumerate(items, start=1):
+            qtext = f"{idx}. {it.get('question','') }"
+            # wrap long lines
+            max_chars = 90
+            parts = [qtext[i:i+max_chars] for i in range(0, len(qtext), max_chars)]
+            for pidx, part in enumerate(parts):
+                c.drawString(margin+10, y, part)
+                newline(1)
+            # difficulty
+            diff = f"Difficulty: {it.get('difficulty','') }"
+            c.drawString(margin+20, y, diff)
+            newline(1)
+            # expected key points as bullets
+            ek = it.get('expected_key_points', []) or []
+            for bullet in ek:
+                # wrap bullet
+                bparts = [bullet[i:i+80] for i in range(0, len(bullet), 80)]
+                c.drawString(margin+30, y, u"\u2022 " + bparts[0])
+                newline(1)
+                for cont in bparts[1:]:
+                    c.drawString(margin+40, y, cont)
+                    newline(1)
+            newline(1)
+
+    # Resume section (if present)
+    resume = payload.get('resume_questions', [])
+    if resume:
+        render_section('Resume-based Questions', resume)
+    # CN
+    render_section('Computer Networks', payload.get('computer_networks', []))
+    # OS
+    render_section('Operating Systems', payload.get('operating_systems', []))
+
+    c.save()
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    return pdf_bytes
+
+
+class ExportQuestionsPayload(BaseModel):
+    resume_questions: list = []
+    computer_networks: list = []
+    operating_systems: list = []
+    format: str = 'both'  # json, pdf, both
+
+
+@app.post('/export-questions')
+def export_questions(payload: ExportQuestionsPayload):
+    """Export provided questions as downloadable JSON, PDF, or ZIP containing both.
+    - `format` values: `json`, `pdf`, `both`.
+    Returns a StreamingResponse or JSONResponse with appropriate `Content-Disposition` header.
+    """
+    # Normalize format
+    fmt = (payload.format or 'both').lower()
+    data = {
+        'resume_questions': payload.resume_questions or [],
+        'computer_networks': payload.computer_networks or [],
+        'operating_systems': payload.operating_systems or [],
+    }
+
+    if fmt == 'json':
+        content = json.dumps(data, indent=2, ensure_ascii=False)
+        headers = { 'Content-Disposition': 'attachment; filename="questions.json"' }
+        return JSONResponse(content=json.loads(content), headers=headers)
+
+    # For PDF or both, attempt to build PDF
+    if fmt in ('pdf','both'):
+        try:
+            pdf_bytes = _render_pdf(data)
+        except Exception as e:
+            # If PDF generation fails, fall back to returning JSON with error status
+            return JSONResponse(status_code=500, content={'error': 'PDF generation failed', 'details': str(e)})
+
+    if fmt == 'pdf':
+        headers = { 'Content-Disposition': 'attachment; filename="questions.pdf"' }
+        return StreamingResponse(io.BytesIO(pdf_bytes), media_type='application/pdf', headers=headers)
+
+    # both -> build a zip archive with JSON and PDF
+    if fmt == 'both':
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr('questions.json', json.dumps(data, indent=2, ensure_ascii=False))
+            zf.writestr('questions.pdf', pdf_bytes)
+        buf.seek(0)
+        headers = { 'Content-Disposition': 'attachment; filename="questions_bundle.zip"' }
+        return StreamingResponse(buf, media_type='application/zip', headers=headers)
+
+    return JSONResponse(status_code=400, content={'error': 'invalid format, must be json|pdf|both'})
+
+
+@app.post('/generate-questions')
+def generate_questions(payload: GenerateQuestionsPayload):
+    """Generate interview questions in structured JSON.
+    Behavior:
+      - If `resume_text` is provided (non-empty), extract conservative resume facts and emit up to 5 resume-based questions.
+      - Always emit at least 10 Computer Networks and 10 Operating Systems questions from deterministic banks.
+    The endpoint avoids hallucination by only using extracted resume tokens and a fixed question bank.
+    """
+    res_text = (payload.resume_text or '').strip()
+    sections = _extract_resume_sections(res_text)
+    resume_qs = _build_resume_questions(sections) if res_text else []
+
+    cn_bank = _cn_question_bank()
+    os_bank = _os_question_bank()
+
+    # Ensure at least 10 each
+    cn_questions = cn_bank[:max(10, len(cn_bank))]
+    os_questions = os_bank[:max(10, len(os_bank))]
+
+    return {
+        'resume_questions': resume_qs,
+        'computer_networks': cn_questions,
+        'operating_systems': os_questions,
+    }
