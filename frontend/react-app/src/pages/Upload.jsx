@@ -1,6 +1,6 @@
 import React, { useRef, useState, useContext } from 'react'
 import { AppDataContext } from '../App'
-import { uploadResumeFile } from '../services/api'
+import api from '../services/api'
 import { useNavigate } from 'react-router-dom'
 
 export default function Upload(){
@@ -18,7 +18,7 @@ export default function Upload(){
     setError('')
     setLoading(true)
     try{
-      const data = await uploadResumeFile(file)
+      const data = await api.uploadResume(file)
       // store upload_id and parsed basics
       setResumeData({ upload_id: data.upload_id, name: data.name, skills: data.skills, experience: data.experience })
       setLoading(false)

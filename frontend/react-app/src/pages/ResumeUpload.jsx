@@ -18,7 +18,7 @@ export default function ResumeUpload(){
     setError('')
     setLoading(true)
     try{
-      const json = await api.uploadResumeFile(file)
+      const json = await api.uploadResume(file)
       // store upload_id and basics
       setResumeData({ upload_id: json.upload_id, name: json.name, skills: json.skills, experience: json.experience })
       setLoading(false)
