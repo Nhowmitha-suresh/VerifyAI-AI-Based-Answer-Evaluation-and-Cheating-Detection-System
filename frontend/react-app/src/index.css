@@ -5,10 +5,15 @@ body{background:linear-gradient(180deg,var(--bg),#06070a);color:#E6EEF8;font-fam
 .app{display:flex;flex-direction:column;height:100%}
 .top{padding:16px 20px;display:flex;align-items:center;gap:12px}
 .main{display:flex;flex:1;padding:20px;gap:18px}
-.panel{background:#0f1418;padding:12px;border-radius:12px;flex:1}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:20px;border-radius:12px;flex:1;border:1px solid rgba(255,255,255,0.04)}
 .camera{width:100%;height:420px;background:#061018;border-radius:8px;display:flex;align-items:center;justify-content:center}
 .controls{display:flex;gap:10px;margin-top:10px}
-.btn{background:linear-gradient(90deg,var(--violet),var(--lav));padding:8px 12px;border-radius:10px;border:none;color:#071022;cursor:pointer}
+.btn{background:linear-gradient(90deg,var(--violet),var(--lav));padding:10px 14px;border-radius:10px;border:none;color:#071022;cursor:pointer;font-weight:700}
+
+/* Sidebar + Topbar */
+.sidebar{display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between}
+.home-screen{display:flex;align-items:center;justify-content:center;padding:24px}
 
 /* Interview screen styles */
 .interview-container{display:flex;gap:18px;padding:20px}
@@ -29,3 +34,49 @@ body{background:linear-gradient(180deg,var(--bg),#06070a);color:#E6EEF8;font-fam
 .question-actions{display:flex;align-items:center;gap:12px}
 
 @media(max-width:900px){.interview-container{flex-direction:column}.camera-panel{order:1}.question-panel{order:2}}
+
+/* Reports page styles */
+.report-page{display:flex;flex-direction:column;gap:18px}
+.report-header{display:flex;gap:18px;align-items:flex-start}
+.profile-card{display:flex;gap:16px;align-items:center;padding:18px}
+.profile-card .avatar{width:96px;height:96px;border-radius:999px;background:linear-gradient(135deg,var(--violet),var(--lav));box-shadow:0 6px 18px rgba(124,92,252,0.12)}
+.profile-card .profile-info h3{margin:0;display:flex;align-items:center;gap:10px}
+.profile-card .profile-info .tag{background:#052c1d;color:#a5f3c7;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:700}
+.profile-card .meta{font-size:13px;opacity:0.7;margin-top:6px}
+
+.stats-row{display:flex;gap:12px;flex:1}
+.stat-card{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center}
+.stat-card .stat-title{font-weight:700;opacity:0.9;margin-bottom:8px}
+.circular-score{width:86px;height:86px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:800;background:conic-gradient(#34d399 0% 92%, rgba(255,255,255,0.03) 92%);color:white;margin:8px 0}
+.muted{opacity:0.7;font-size:13px}
+
+.report-grid{display:grid;grid-template-columns:1fr 1fr 360px;gap:16px}
+.performance-card{padding:18px}
+.perf-row{display:flex;align-items:center;gap:12px;margin:12px 0}
+.perf-row .label{width:160px;opacity:0.9}
+.perf-row .rail{flex:1;height:10px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden}
+.perf-row .rail .fill{height:100%;background:linear-gradient(90deg,var(--violet),var(--lav))}
+.perf-row .value{width:48px;text-align:right;opacity:0.9}
+
+.score-trend-card{padding:18px}
+.score-trend-card .chart{height:180px;background:linear-gradient(180deg,rgba(7,16,30,0.3),transparent);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#9AA6B2}
+
+.integrity-card{padding:18px}
+.integrity-list{list-style:none;padding:0;margin:0}
+.integrity-list li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.02)}
+.integrity-list li .ok{color:#34d399}
+.integrity-list li .no{color:#ef4444}
+.integrity-list li .warn{color:#f59e0b}
+.integrity-score{margin-top:12px;padding:12px;background:rgba(255,255,255,0.02);border-radius:8px;text-align:center}
+
+.ai-feedback{padding:18px}
+.feedback-grid{display:grid;grid-template-columns:1fr 220px 1fr;gap:12px}
+.feedback-strengths, .feedback-improve{background:linear-gradient(180deg,rgba(6,17,25,0.3),transparent);padding:12px;border-radius:8px}
+.feedback-robot{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+.robot{width:84px;height:84px;border-radius:12px;background:linear-gradient(135deg,#7C5CFC,#C084FC);display:flex;align-items:center;justify-content:center;font-size:36px}
+
+.question-summary{padding:18px;display:flex;flex-direction:column;align-items:center}
+.question-summary .pie{width:160px;height:160px;border-radius:999px;background:conic-gradient(#10b981 0 75%, #f59e0b 75% 90%, #ef4444 90%);margin-bottom:12px}
+.question-summary .summary-list{display:flex;flex-direction:column;gap:6px;text-align:center}
+
+@media(max-width:1100px){.report-grid{grid-template-columns:1fr;}.stats-row{flex-direction:column}}

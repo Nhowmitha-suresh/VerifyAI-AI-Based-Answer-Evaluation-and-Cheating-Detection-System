@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from "react"
 import InterviewFlow from "../services/interviewFlow"
+import WarningSystem from "./WarningSystem"
 
 export default function InterviewScreen({
   duration = 120,
@@ -173,16 +174,16 @@ export default function InterviewScreen({
 
   // 🎨 UI
   return (
-    <div style={styles.container}>
+    <div className="interview-container">
+      <WarningSystem alerts={alerts} />
 
-      {/* LEFT - CAMERA */}
-      <div style={styles.left}>
+      <div className="camera-panel camera-wrap">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          style={styles.video}
+          className="camera-video"
         />
 
         <canvas
@@ -192,94 +193,43 @@ export default function InterviewScreen({
           style={{ display: "none" }}
         />
 
-        <div style={styles.controls}>
-          <button
-            onClick={startInterview}
-            disabled={phase !== "idle"}
-            style={styles.startBtn}
-          >
-            Start Interview
-          </button>
+        <div className="camera-overlay">
+          <div className="overlay-left">
+            <div className="timer">{secondsLeft}s</div>
+            <div className="progress" aria-hidden>
+              <div className="progress-bar" style={{width: `${(secondsLeft/duration)*100}%`}} />
+            </div>
+          </div>
 
-          <button onClick={stopInterview} style={styles.stopBtn}>
-            Stop
-          </button>
+          <div className="overlay-right">
+            <div>Phase: {phase}</div>
+            <div>Cam: {cameraStatus}</div>
+            <div>WS: {wsStatus}</div>
+          </div>
         </div>
 
-        <div style={styles.status}>
-          <div>Phase: {phase}</div>
-          <div>Camera: {cameraStatus}</div>
-          <div>WebSocket: {wsStatus}</div>
-        </div>
-      </div>
-
-      {/* RIGHT PANEL */}
-      <div style={styles.right}>
-        <h2>Question</h2>
-        <p>{question}</p>
-
-        <div style={styles.info}>
-          <div>Integrity: {integrityScore ?? "--"}</div>
-          <div>Alerts: {(alerts || []).join(", ") || "None"}</div>
-          <div>Time Left: {secondsLeft}s</div>
+        <div className="camera-controls" style={{marginTop:12}}>
+          <button className="btn" onClick={startInterview} disabled={phase !== 'idle'}>Start Interview</button>
+          <button className="btn" style={{background:'#ef4444',color:'white'}} onClick={stopInterview}>Stop</button>
         </div>
       </div>
 
+      <aside className="question-panel">
+        <h3 className="question-title">Question</h3>
+        <div className="question-text">{question}</div>
+
+        <div className="answer-area">
+          <textarea placeholder="Notes (optional)" />
+        </div>
+
+        <div className="question-actions">
+          <div>Integrity Score: <strong>{integrityScore ?? '--'}</strong></div>
+          <div>Alerts: {(alerts || []).length || 0}</div>
+        </div>
+      </aside>
     </div>
   )
 }
 
 // 🎨 Styles
-const styles = {
-  container: {
-    display: "flex",
-    height: "100vh",
-    background: "#020617",
-    color: "white"
-  },
-  left: {
-    flex: 1,
-    padding: 20
-  },
-  right: {
-    width: 400,
-    padding: 20,
-    background: "#0f172a"
-  },
-  video: {
-    width: "100%",
-    borderRadius: 12,
-    background: "black"
-  },
-  controls: {
-    marginTop: 12,
-    display: "flex",
-    gap: 10
-  },
-  startBtn: {
-    padding: "10px 18px",
-    borderRadius: 8,
-    border: "none",
-    background: "#6366f1",
-    color: "white",
-    cursor: "pointer"
-  },
-  stopBtn: {
-    padding: "10px 18px",
-    borderRadius: 8,
-    border: "none",
-    background: "#ef4444",
-    color: "white",
-    cursor: "pointer"
-  },
-  status: {
-    marginTop: 10,
-    opacity: 0.7
-  },
-  info: {
-    marginTop: 20,
-    display: "flex",
-    flexDirection: "column",
-    gap: 10
-  }
-}
+// styles moved to index.css

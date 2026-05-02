@@ -40,6 +40,9 @@ ws_processing_lock = asyncio.Lock()
 
 # Simple in-memory session store (for demo; replace with persistent store in prod)
 _sessions = {}
+# In-memory stores for uploaded resumes and generated reports (demo only)
+_uploads = {}
+_reports = {}
 
 
 @app.post('/session/start')
@@ -61,6 +64,8 @@ def session_end(sid: str = Query(None)):
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -691,3 +696,112 @@ def generate_questions(payload: GenerateQuestionsPayload):
         'computer_networks': cn_questions,
         'operating_systems': os_questions,
     }
+
+
+@app.post('/upload')
+async def upload_resume(file: UploadFile = File(...)):
+    """Accept a resume file, extract text (best-effort), and return parsed summary.
+    Returns: { upload_id, name, skills, experience }
+    """
+    try:
+        content = await file.read()
+        # try decode as utf-8 text first
+        text = None
+        try:
+            text = content.decode('utf-8')
+        except Exception:
+            # fallback: try latin1
+            try:
+                text = content.decode('latin1')
+            except Exception:
+                text = ''
+
+        # very simple name extraction: first line with two capitalized words
+        name = None
+        for ln in (text or '').splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            parts = ln.split()
+            if len(parts) >= 2 and all(p[0].isupper() for p in parts[:2] if p):
+                name = ' '.join(parts[:2])
+                break
+        if not name:
+            name = 'Candidate'
+
+        sections = _extract_resume_sections(text or '')
+        upload_id = uuid4().hex
+        _uploads[upload_id] = {'text': text or '', 'sections': sections, 'name': name, 'uploaded': datetime.utcnow().isoformat()}
+
+        # derive experience stub from coursework or projects length
+        experience = ''
+        if sections.get('projects'):
+            experience = sections['projects'][0]
+        elif sections.get('coursework'):
+            experience = ', '.join(sections['coursework'][:3])
+
+        return {'upload_id': upload_id, 'name': name, 'skills': sections.get('skills',[]), 'experience': experience}
+    except Exception as e:
+        logger.exception('upload_resume error')
+        return JSONResponse(status_code=500, content={'error':'upload failed','detail': str(e)})
+
+
+@app.get('/questions')
+def get_questions(upload_id: str = Query(None)):
+    """Return generated questions for an uploaded resume. If upload_id provided, use that resume; otherwise generate generic bank."""
+    try:
+        res_text = ''
+        if upload_id and upload_id in _uploads:
+            res_text = _uploads[upload_id].get('text','')
+
+        sections = _extract_resume_sections(res_text)
+        resume_qs = _build_resume_questions(sections) if res_text else []
+        cn_bank = _cn_question_bank()
+        os_bank = _os_question_bank()
+        return {'resume_questions': resume_qs, 'computer_networks': cn_bank[:10], 'operating_systems': os_bank[:10]}
+    except Exception as e:
+        logger.exception('get_questions error')
+        return JSONResponse(status_code=500, content={'error':'questions generation failed','detail':str(e)})
+
+
+class SubmitPayload(BaseModel):
+    upload_id: str
+    answers: list
+
+
+@app.post('/submit')
+def submit_answers(payload: SubmitPayload):
+    """Accept answers list and compute simple evaluation. Store a report for later GET /report."""
+    try:
+        upload_id = payload.upload_id
+        answers = payload.answers or []
+        total = len(answers)
+        if total == 0:
+            score = 0
+        else:
+            nonempty = sum(1 for a in answers if (a and str(a).strip()))
+            score = int((nonempty/total)*100)
+
+        integrity = 90 + (score//20) if score>0 else 50
+        if integrity>100: integrity=100
+        risk = 'Low' if score>=70 else ('Medium' if score>=40 else 'High')
+
+        report = {'score': score, 'integrity': int(integrity), 'risk': risk, 'generated': datetime.utcnow().isoformat()}
+        if upload_id:
+            _reports[upload_id] = report
+
+        return {'status':'ok','report': report}
+    except Exception as e:
+        logger.exception('submit_answers error')
+        return JSONResponse(status_code=500, content={'error':'submit failed','detail':str(e)})
+
+
+@app.get('/report')
+def get_report(upload_id: str = Query(None)):
+    try:
+        if not upload_id or upload_id not in _reports:
+            return JSONResponse(status_code=404, content={'error':'report not found'})
+        return _reports[upload_id]
+    except Exception as e:
+        logger.exception('get_report error')
+        return JSONResponse(status_code=500, content={'error':'failed','detail':str(e)})
