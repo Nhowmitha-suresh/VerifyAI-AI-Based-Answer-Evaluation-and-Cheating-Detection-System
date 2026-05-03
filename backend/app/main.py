@@ -7,6 +7,7 @@ from pydantic import BaseModel
 import logging
 import asyncio
 from app.nlp import score_answer
+from app import nlp as nlp_tools
 import cv2
 import numpy as np
 import os
@@ -24,6 +25,11 @@ try:
     REPORTLAB_AVAILABLE = True
 except Exception:
     REPORTLAB_AVAILABLE = False
+try:
+    import PyPDF2
+    PDF_PYPDF2_AVAILABLE = True
+except Exception:
+    PDF_PYPDF2_AVAILABLE = False
 
 app = FastAPI(title="verifAI - Starter API")
 
@@ -132,6 +138,31 @@ def nlp_score(payload: QAPayload):
     except Exception as e:
         logger.exception('nlp_score error')
         return JSONResponse(status_code=500, content={"error": "nlp scoring failed", "detail": str(e)})
+
+
+@app.post('/evaluate')
+def evaluate(payload: QAPayload):
+    """Evaluate a single question/answer pair and return structured JSON with scores (0-10) and final average.
+    """
+    try:
+        grammar = nlp_tools.grammar_score_text(payload.answer)
+        relevance_pct, details = score_answer(payload.question, payload.answer, payload.keywords)
+        # map 0-100 to 0-10
+        relevance = int(round(relevance_pct / 10.0))
+        genuineness = nlp_tools.genuineness_score_text(payload.answer)
+        final = round((grammar + relevance + genuineness) / 3.0, 2)
+        return {
+            'question': payload.question,
+            'answer': payload.answer,
+            'grammar_score': int(grammar),
+            'relevance_score': int(relevance),
+            'genuineness_score': int(genuineness),
+            'final_score': final,
+            'nlp_details': details,
+        }
+    except Exception as e:
+        logger.exception('evaluate error')
+        return JSONResponse(status_code=500, content={'error':'evaluation failed','detail':str(e)})
 
 @app.post("/detect-face")
 async def detect_face(file: UploadFile = File(...)):
@@ -435,6 +466,77 @@ def _extract_resume_sections(text: str):
     return sections
 
 
+def _extract_contact_meta(text: str):
+    """Extract contact and metadata from resume text: emails, phones, education lines, domain, years_experience, name hints."""
+    meta = {'emails': [], 'phones': [], 'education': [], 'domain': None, 'years_experience': None, 'name': None}
+    if not text or not text.strip():
+        return meta
+    low = text.lower()
+    # emails
+    emails = re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", text)
+    meta['emails'] = list(dict.fromkeys(emails))
+    # phones: crude but practical pattern
+    phones = re.findall(r"\+?\d[\d\-\s\(\)]{7,}\d", text)
+    meta['phones'] = list(dict.fromkeys([p.strip() for p in phones]))
+    # education: prefer lines under Education header, otherwise lines containing University/College/Institute
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    edu = []
+    cur = None
+    for ln in lines:
+        lowln = ln.lower()
+        if lowln.startswith('education') or lowln.startswith('educational'):
+            cur = 'edu'
+            continue
+        if cur == 'edu':
+            if re.match(r'^[A-Z0-9]', ln):
+                edu.append(ln)
+            else:
+                # stop if next header-like line
+                if ':' in ln and len(ln.split())<6:
+                    cur = None
+        if any(k in lowln for k in ('university','college','institute','school')):
+            edu.append(ln)
+    # also search for degree keywords
+    degs = re.findall(r"(b\.?s\.?|bachelor(?:'s)?|m\.?s\.?|master(?:'s)?|mba|ph\.?d\.?|doctorate)[^,\n]*", text, flags=re.I)
+    for d in degs:
+        edu.append(d.strip())
+    meta['education'] = list(dict.fromkeys(edu))
+    # years of experience
+    m = re.search(r"(\d+)\s+years?\s+of\s+experience|(\d+)\+?\s+years", low)
+    if m:
+        yrs = next((g for g in m.groups() if g), None)
+        try:
+            meta['years_experience'] = int(yrs)
+        except Exception:
+            meta['years_experience'] = None
+    # domain inference from keywords
+    domain_map = {
+        'Data Science': ['data science','machine learning','ml','deep learning','nlp','artificial intelligence','ai'],
+        'Software Engineering': ['software engineer','backend','frontend','full stack','full-stack','developer','programming','software development'],
+        'DevOps': ['devops','docker','kubernetes','ci/cd','infrastructure','terraform'],
+        'Security': ['security','cyber','penetration','vulnerability'],
+        'Finance': ['finance','financial','banking','trading','quant'],
+        'Marketing': ['marketing','seo','content','social media'],
+        'Embedded': ['embedded','firmware','microcontroller','rtos'],
+        'Product': ['product manager','product management']
+    }
+    scores = {}
+    for dom, keys in domain_map.items():
+        for k in keys:
+            if k in low:
+                scores[dom] = scores.get(dom,0) + low.count(k)
+    if scores:
+        meta['domain'] = max(scores.items(), key=lambda x: x[1])[0]
+    # name: look for explicit 'Name:' line or fallback later
+    for ln in lines[:8]:
+        if re.match(r'^(name[:\-\s])', ln.lower()):
+            parts = ln.split(':',1)
+            if len(parts)>1 and parts[1].strip():
+                meta['name'] = parts[1].strip()
+                break
+    return meta
+
+
 def _build_resume_questions(sections: dict, max_q: int = 5):
     """Generate up to `max_q` resume-focused questions based only on extracted sections.
     Avoids inventing any facts — if a section is empty it is skipped.
@@ -548,6 +650,56 @@ def _os_question_bank():
          'expected_key_points': ['Collect vmstat/top, identify working set', 'Increase RAM, tune swappiness, find memory leaks']},
     ]
     return bank
+
+
+def _hr_question_bank():
+    # 50 standard HR questions (deterministic list)
+    base = [
+        "Tell me about yourself.",
+        "Why are you interested in this role?",
+        "What are your strengths?",
+        "What are your weaknesses?",
+        "Where do you see yourself in 5 years?",
+        "Why did you leave your last job?",
+        "Describe a difficult work situation and how you overcame it.",
+        "How do you handle tight deadlines?",
+        "Tell me about a time you failed and what you learned.",
+        "How do you prioritize tasks?",
+    ]
+    # Expand to 50 by templating
+    extras = []
+    templates = [
+        "Describe a time you led a team to success.",
+        "How do you handle conflict with coworkers?",
+        "What motivates you at work?",
+        "Tell me about a project you are proud of.",
+        "How do you handle constructive criticism?",
+        "Explain a time you improved a process.",
+        "What is your ideal work environment?",
+        "How do you stay organized?",
+        "What professional achievement are you most proud of?",
+        "Describe how you adapt to change.",
+    ]
+    while len(extras) + len(base) < 50:
+        extras.extend(templates)
+    bank = [{'question': q, 'difficulty': 'Medium', 'expected_key_points': []} for q in (base + extras)[:50]]
+    return bank
+
+
+def _personality_question_bank():
+    items = [
+        "How would your colleagues describe you?",
+        "What do you do to manage stress?",
+        "Describe a hobby or interest outside work.",
+        "How do you make decisions under uncertainty?",
+        "Tell me about a recent book or article you enjoyed.",
+        "What values are most important to you in a workplace?",
+        "How do you approach teamwork?",
+        "What are you passionate about?",
+        "Describe a time you demonstrated resilience.",
+        "How do you balance work and personal life?",
+    ]
+    return [{'question': q, 'difficulty': 'Easy', 'expected_key_points': []} for q in items]
 
 
 def _render_pdf(payload: dict) -> bytes:
@@ -686,6 +838,8 @@ def generate_questions(payload: GenerateQuestionsPayload):
 
     cn_bank = _cn_question_bank()
     os_bank = _os_question_bank()
+    hr_bank = _hr_question_bank()
+    personality_bank = _personality_question_bank()
 
     # Ensure at least 10 each
     cn_questions = cn_bank[:max(10, len(cn_bank))]
@@ -695,6 +849,8 @@ def generate_questions(payload: GenerateQuestionsPayload):
         'resume_questions': resume_qs,
         'computer_networks': cn_questions,
         'operating_systems': os_questions,
+        'hr_questions': hr_bank[:50],
+        'personality_questions': personality_bank[:10],
     }
 
 
@@ -705,16 +861,30 @@ async def upload_resume(file: UploadFile = File(...)):
     """
     try:
         content = await file.read()
-        # try decode as utf-8 text first
-        text = None
-        try:
-            text = content.decode('utf-8')
-        except Exception:
-            # fallback: try latin1
+        text = ''
+        # If PDF and PyPDF2 available, try extracting text from PDF bytes
+        fname = (getattr(file, 'filename', '') or '').lower()
+        if fname.endswith('.pdf') and PDF_PYPDF2_AVAILABLE:
             try:
-                text = content.decode('latin1')
+                reader = PyPDF2.PdfReader(io.BytesIO(content))
+                pages = []
+                for p in reader.pages:
+                    try:
+                        pages.append(p.extract_text() or '')
+                    except Exception:
+                        pages.append('')
+                text = '\n'.join(pages)
             except Exception:
                 text = ''
+        else:
+            # try decode as utf-8 text first, fallback to latin1
+            try:
+                text = content.decode('utf-8')
+            except Exception:
+                try:
+                    text = content.decode('latin1')
+                except Exception:
+                    text = ''
 
         # very simple name extraction: first line with two capitalized words
         name = None
@@ -730,8 +900,9 @@ async def upload_resume(file: UploadFile = File(...)):
             name = 'Candidate'
 
         sections = _extract_resume_sections(text or '')
+        meta = _extract_contact_meta(text or '')
         upload_id = uuid4().hex
-        _uploads[upload_id] = {'text': text or '', 'sections': sections, 'name': name, 'uploaded': datetime.utcnow().isoformat()}
+        _uploads[upload_id] = {'text': text or '', 'sections': sections, 'name': name, 'meta': meta, 'uploaded': datetime.utcnow().isoformat()}
 
         # derive experience stub from coursework or projects length
         experience = ''
@@ -740,7 +911,14 @@ async def upload_resume(file: UploadFile = File(...)):
         elif sections.get('coursework'):
             experience = ', '.join(sections['coursework'][:3])
 
-        return {'upload_id': upload_id, 'name': name, 'skills': sections.get('skills',[]), 'experience': experience}
+        resp = {'upload_id': upload_id, 'name': name, 'skills': sections.get('skills',[]), 'experience': experience}
+        # include contact meta in response (concise)
+        resp['emails'] = meta.get('emails', [])
+        resp['phones'] = meta.get('phones', [])
+        resp['education'] = meta.get('education', [])
+        resp['domain'] = meta.get('domain')
+        resp['years_experience'] = meta.get('years_experience')
+        return resp
     except Exception as e:
         logger.exception('upload_resume error')
         return JSONResponse(status_code=500, content={'error':'upload failed','detail': str(e)})
