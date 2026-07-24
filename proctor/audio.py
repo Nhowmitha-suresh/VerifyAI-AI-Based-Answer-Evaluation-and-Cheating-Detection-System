@@ -11,26 +11,35 @@ from .config import (
     MOUTH_OPEN_THRESHOLD, AUDIO_RMS_THRESHOLD, VAD_WINDOW,
     TTS_RATE, AUDIO_RATE, AUDIO_CHANNELS, AUDIO_BLOCK_MS
 )
+from .logger import logger
 
 try:
     import sounddevice as sd
-except Exception:
+except Exception as e:
+    logger.info(f"[AUDIO INFO] PyAudio / sounddevice not available ({e}). Microphone VAD will be disabled.")
     sd = None
 
 try:
     import webrtcvad
     HAS_VAD = True
-except Exception:
+except Exception as e:
+    logger.info(f"[AUDIO INFO] WebRTC VAD not available ({e}). Falling back to RMS energy VAD.")
     HAS_VAD = False
 
 if sys.platform == "win32":
-    import winsound
+    try:
+        import winsound
+    except Exception:
+        winsound = None
+else:
+    winsound = None
 
 try:
     import pyttsx3
     tts_engine = pyttsx3.init()
     tts_engine.setProperty("rate", TTS_RATE)
-except Exception:
+except Exception as e:
+    logger.info(f"[AUDIO INFO] PyTTSx3 synthesis unavailable ({e}). Voice alerts disabled.")
     tts_engine = None
 
 _alarm_lock = threading.Lock()
@@ -48,16 +57,16 @@ def speak_async(text):
             try:
                 tts_engine.say(text)
                 tts_engine.runAndWait()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"TTS Engine execution error: {e}")
     threading.Thread(target=_run, daemon=True).start()
 
 def beep(freq=1000, duration=300):
-    if sys.platform == "win32":
+    if winsound and sys.platform == "win32":
         try:
             winsound.Beep(freq, duration)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Winsound beep error: {e}")
 
 def start_alert(mode):
     global _alarm_mode, _stop_alarm
@@ -101,13 +110,15 @@ class AudioMonitor:
         if HAS_VAD:
             try:
                 self.vad = webrtcvad.Vad(2)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"WebRTC VAD initialization error: {e}")
                 self.vad = None
         self.stream = None
         self.running = False
 
     def start(self):
         if sd is None:
+            logger.info("Sounddevice microphone stream skipped (library not installed).")
             return
         try:
             self.running = True
@@ -118,22 +129,27 @@ class AudioMonitor:
                 callback=self._callback
             )
             self.stream.start()
+            logger.info("Microphone audio stream started successfully.")
         except Exception as e:
-            print("[AUDIO WARN] Microphone capture stream error:", e)
+            logger.warning(f"[AUDIO WARN] Microphone capture stream error: {e}. Audio VAD disabled.")
+            self.running = False
 
     def _callback(self, indata, frames, time_info, status):
         if indata is None:
             return
-        pcm16 = (indata[:, 0] * 32767).astype(np.int16).tobytes()
-        self.buffer.append(pcm16)
+        try:
+            pcm16 = (indata[:, 0] * 32767).astype(np.int16).tobytes()
+            self.buffer.append(pcm16)
+        except Exception as e:
+            logger.debug(f"Audio stream callback exception: {e}")
 
     def stop(self):
         if self.stream:
             try:
                 self.stream.stop()
                 self.stream.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Error stopping microphone stream: {e}")
         self.running = False
 
     def recent_audio_activity(self, window_sec=0.6):
@@ -157,5 +173,6 @@ class AudioMonitor:
                 arr = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32767.0
                 rms = np.sqrt(np.mean(arr * arr)) if arr.size else 0.0
                 return rms > AUDIO_RMS_THRESHOLD
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Audio RMS calculation exception: {e}")
                 return False

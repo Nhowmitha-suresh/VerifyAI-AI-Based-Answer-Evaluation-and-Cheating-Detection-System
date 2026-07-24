@@ -7,6 +7,7 @@ import time
 import threading
 import numpy as np
 from .config import CAMERA_INDEXES, VERIFICATION_WINDOW_SEC
+from .logger import logger
 
 class CameraManager:
     BACKENDS = [
@@ -29,11 +30,11 @@ class CameraManager:
 
     def _auto_discover_camera(self):
         """Test camera indexes 0-4 using DirectShow, MSMF, and CAP_ANY with frame verification."""
-        print("[CAMERA DISCOVERY] Starting multi-backend webcam auto-discovery (Indexes 0..4)...")
+        logger.info("[CAMERA DISCOVERY] Starting multi-backend webcam auto-discovery (Indexes 0..4)...")
         
         for idx in CAMERA_INDEXES:
             for backend, backend_name in self.BACKENDS:
-                print(f"[CAMERA DISCOVERY] Testing Camera Index {idx} using {backend_name}...")
+                logger.info(f"[CAMERA DISCOVERY] Testing Camera Index {idx} using {backend_name}...")
                 try:
                     test_cap = cv2.VideoCapture(idx, backend)
                     if test_cap and test_cap.isOpened():
@@ -41,17 +42,23 @@ class CameraManager:
                         test_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
                         ret, frame = test_cap.read()
                         if ret and frame is not None and frame.size > 0:
-                            print(f"[CAMERA DISCOVERY SUCCESS] Verified Camera Index {idx} using {backend_name}! Frame size: {frame.shape[1]}x{frame.shape[0]}")
+                            fps = test_cap.get(cv2.CAP_PROP_FPS) or 30.0
+                            logger.info(
+                                f"[CAMERA SUCCESS] Camera opened successfully!\n"
+                                f"  - Index: {idx}\n"
+                                f"  - Backend: {backend_name}\n"
+                                f"  - Resolution: {frame.shape[1]}x{frame.shape[0]}\n"
+                                f"  - FPS: {fps}"
+                            )
                             self._display_verification_preview(test_cap, idx, backend_name, frame)
                             self.cap = test_cap
                             return
                         test_cap.release()
                 except Exception as e:
-                    print(f"[CAMERA DISCOVERY WARN] Index {idx} / {backend_name} failed: {e}")
-                    pass
+                    logger.warning(f"[CAMERA DISCOVERY WARN] Index {idx} / {backend_name} failed: {e}")
 
-        print("[CAMERA DISCOVERY ERROR] Every backend (DirectShow, MSMF, CAP_ANY) and index (0..4) failed.")
-        print("[CAMERA WARN] Enabling synthetic camera feed fallback.")
+        logger.error("[CAMERA DISCOVERY ERROR] Every backend (DirectShow, MSMF, CAP_ANY) and index (0..4) failed.")
+        logger.warning("[CAMERA WARN] Enabling synthetic camera feed fallback.")
         self.is_synthetic = True
 
     def _display_verification_preview(self, test_cap, idx, backend_name, initial_frame):
@@ -62,8 +69,8 @@ class CameraManager:
         try:
             cv2.namedWindow(win_title, cv2.WINDOW_NORMAL)
             cv2.resizeWindow(win_title, 960, 540)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to create verification window: {e}")
 
         while time.time() - start_t < VERIFICATION_WINDOW_SEC:
             ret, frame = test_cap.read()
@@ -85,13 +92,14 @@ class CameraManager:
                 cv2.imshow(win_title, frame)
                 if cv2.waitKey(50) & 0xFF == 27:
                     break
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Verification frame rendering exception: {e}")
                 break
 
         try:
             cv2.destroyWindow(win_title)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error destroying verification window: {e}")
 
     def start(self):
         """Start asynchronous background frame capture thread."""
@@ -132,5 +140,5 @@ class CameraManager:
         if self.cap:
             try:
                 self.cap.release()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Error releasing VideoCapture hardware: {e}")

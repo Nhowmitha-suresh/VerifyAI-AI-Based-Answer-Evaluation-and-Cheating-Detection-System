@@ -19,7 +19,7 @@ with SilenceFD():
 from .config import (
     CAM_W, CAM_H, PROCESS_EVERY_N, ENABLE_HANDS, ENABLE_OBJECT_DETECTION, ENABLE_AUDIO,
     ALARM_MEDIUM, ALARM_HIGH, HAND_FACE_DIST_RATIO, HAND_SUSTAIN,
-    EAR_CLOSED_THRESH, EAR_CLOSED_SUSTAIN, MOUTH_OPEN_THRESHOLD,
+    EAR_CLOSED_THRESH, EAR_CLOSED_SUSTAIN, MOUTH_OPEN_THRESHOLD, VAD_WINDOW, MOUTH_TOP_BOTTOM,
     WEIGHT_PHONE_DETECTED, WEIGHT_WINDOW_SWITCH, WEIGHT_OFFSCREEN, WEIGHT_HEADTURN,
     WEIGHT_FULLTURN, WEIGHT_HAND_NEAR, WEIGHT_MULTIFACE, WEIGHT_OCCLUSION,
     WEIGHT_OTHERVOICE, WEIGHT_EYES_CLOSED
@@ -42,94 +42,114 @@ def get_active_window_title():
             buf = ctypes.create_unicode_buffer(length + 1)
             ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
             return buf.value or "Unknown Window"
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Failed to fetch active window title: {e}")
             return "Unknown Window"
     return "Proctoring Window"
 
 
 def main():
-    logger.info("Initializing MediaPipe Solutions with C-level graph silencing...")
+    logger.info("[STARTUP] [1/10] Starting AI Proctoring Application Engine...")
     
-    with SilenceFD():
-        face_mesh = mp.solutions.face_mesh.FaceMesh(
-            max_num_faces=2,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        hands = mp.solutions.hands.Hands(
-            max_num_hands=2,
-            min_detection_confidence=0.5
-        ) if ENABLE_HANDS else None
+    try:
+        logger.info("[STARTUP] [2/10] Initializing MediaPipe FaceMesh & Hands Solutions...")
+        with SilenceFD():
+            face_mesh = mp.solutions.face_mesh.FaceMesh(
+                max_num_faces=2,
+                refine_landmarks=True,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+            hands = mp.solutions.hands.Hands(
+                max_num_hands=2,
+                min_detection_confidence=0.5
+            ) if ENABLE_HANDS else None
+        logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized cleanly.")
 
-    logger.info("MediaPipe initialized cleanly.")
+        logger.info("[STARTUP] [3/10] Initializing CameraManager...")
+        camera = CameraManager(width=CAM_W, height=CAM_H)
+        camera.start()
+        logger.info("[STARTUP] [3/10] CameraManager started successfully.")
 
-    camera = CameraManager(width=CAM_W, height=CAM_H)
-    camera.start()
+        logger.info("[STARTUP] [4/10] Initializing GazeTracker...")
+        gaze_tracker = GazeTracker()
 
-    gaze_tracker = GazeTracker()
-    head_pose_estimator = HeadPoseEstimator()
-    object_detector = ObjectDetector() if ENABLE_OBJECT_DETECTION else None
-    audio_mon = AudioMonitor() if ENABLE_AUDIO else None
+        logger.info("[STARTUP] [5/10] Initializing HeadPoseEstimator...")
+        head_pose_estimator = HeadPoseEstimator()
 
-    if audio_mon:
-        audio_mon.start()
-
-    initial_window = get_active_window_title()
-
-    # Calibration Phase
-    logger.info("Starting baseline gaze calibration...")
-    calib_samples = []
-    calib_start = time.time()
-    while time.time() - calib_start < 2.5:
-        ret, frame = camera.read()
-        if not ret or frame is None:
-            time.sleep(0.02)
-            continue
-        h, w = frame.shape[:2]
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        res = face_mesh.process(rgb)
-        if res.multi_face_landmarks:
-            lm = np.array([(int(p.x * w), int(p.y * h)) for p in res.multi_face_landmarks[0].landmark])
+        logger.info("[STARTUP] [6/10] Initializing ObjectDetector...")
+        object_detector = None
+        if ENABLE_OBJECT_DETECTION:
             try:
-                g_res = gaze_tracker.process(lm, time.time())
-                calib_samples.append((g_res["dx"], g_res["dy"]))
-            except Exception:
-                pass
-        cv2.putText(frame, "CALIBRATING GAZE BASELINE... LOOK AT CENTER", (w // 2 - 260, h // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 255), 2)
+                object_detector = ObjectDetector()
+            except Exception as e:
+                logger.warning(f"ObjectDetector initialization failed: {e}. Subsystem disabled.")
+
+        logger.info("[STARTUP] [7/10] Initializing AudioMonitor...")
+        audio_mon = None
+        if ENABLE_AUDIO:
+            try:
+                audio_mon = AudioMonitor()
+                audio_mon.start()
+            except Exception as e:
+                logger.warning(f"AudioMonitor initialization failed: {e}. Subsystem disabled.")
+
+        initial_window = get_active_window_title()
+
+        # Calibration Phase
+        logger.info("[STARTUP] [8/10] Calibration starting...")
+        calib_samples = []
+        calib_start = time.time()
+        while time.time() - calib_start < 2.5:
+            ret, frame = camera.read()
+            if not ret or frame is None:
+                time.sleep(0.02)
+                continue
+            h, w = frame.shape[:2]
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            res = face_mesh.process(rgb)
+            if res.multi_face_landmarks:
+                lm = np.array([(int(p.x * w), int(p.y * h)) for p in res.multi_face_landmarks[0].landmark])
+                try:
+                    g_res = gaze_tracker.process(lm, time.time())
+                    calib_samples.append((g_res["dx"], g_res["dy"]))
+                except Exception as e:
+                    logger.debug(f"Calibration gaze processing exception: {e}")
+            cv2.putText(frame, "CALIBRATING GAZE BASELINE... LOOK AT CENTER", (w // 2 - 260, h // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 255), 2)
+            try:
+                cv2.imshow("Proctoring System", frame)
+                if cv2.waitKey(1) & 0xFF == 27:
+                    break
+            except Exception as e:
+                logger.warning(f"Calibration window display error: {e}")
+
+        if calib_samples:
+            calib_center = np.mean(calib_samples, axis=0)
+            gaze_tracker.calibrate((0.5 + calib_center[0], 0.5 + calib_center[1]))
+        logger.info("[STARTUP] [9/10] Baseline calibration completed.")
+
+        frame_idx = 0
+        start_time = time.time()
+        last_frame_time = time.time()
+        fps = 30.0
+
+        hand_buf = collections.deque()
+        occ_buf = collections.deque()
+        mf_buf = collections.deque()
+        ear_buf = collections.deque()
+
         try:
-            cv2.imshow("Proctoring System", frame)
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
-        except Exception:
-            pass
+            cv2.namedWindow("Proctoring System", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("Proctoring System", 1280, 720)
+        except Exception as e:
+            logger.warning(f"Could not resize OpenCV window: {e}")
 
-    if calib_samples:
-        calib_center = np.mean(calib_samples, axis=0)
-        gaze_tracker.calibrate((0.5 + calib_center[0], 0.5 + calib_center[1]))
-    logger.info("Calibration complete.")
+        last_high_snapshot = 0
+        last_phone_snapshot = 0
 
-    frame_idx = 0
-    start_time = time.time()
-    last_frame_time = time.time()
-    fps = 30.0
+        logger.info("[STARTUP] [10/10] Entering main detection loop...")
 
-    hand_buf = collections.deque()
-    occ_buf = collections.deque()
-    mf_buf = collections.deque()
-    ear_buf = collections.deque()
-
-    try:
-        cv2.namedWindow("Proctoring System", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Proctoring System", 1280, 720)
-    except Exception:
-        pass
-
-    last_high_snapshot = 0
-    last_phone_snapshot = 0
-
-    try:
         while True:
             ret, frame = camera.read()
             if not ret or frame is None:
@@ -336,6 +356,7 @@ def main():
                 cv2.imshow("Proctoring System", frame)
                 k = cv2.waitKey(1) & 0xFF
                 if k == 27 or k == ord('q') or k == ord('Q'):
+                    logger.info("User requested exit.")
                     break
                 elif k == ord('c') or k == ord('C'):
                     gaze_tracker.calibrate((0.5, 0.5))
@@ -345,19 +366,26 @@ def main():
                     logger.info("Reset risk score.")
                 elif k == ord('s') or k == ord('S'):
                     save_snapshot(frame, reason="manual")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Main loop display exception: {e}")
 
+    except Exception as e:
+        logger.exception("[CRITICAL STARTUP FAILURE] Execution halted due to unhandled exception:")
+        raise e
     finally:
-        if audio_mon:
+        logger.info("Cleaning up proctoring subsystems...")
+        if 'audio_mon' in locals() and audio_mon:
             audio_mon.stop()
-        camera.release()
+        if 'camera' in locals() and camera:
+            camera.release()
         try:
             cv2.destroyAllWindows()
         except Exception:
             pass
-        face_mesh.close()
-        if hands: hands.close()
+        if 'face_mesh' in locals() and face_mesh:
+            face_mesh.close()
+        if 'hands' in locals() and hands:
+            hands.close()
         
         generate_html_report()
         logger.info("Proctoring session exited cleanly.")

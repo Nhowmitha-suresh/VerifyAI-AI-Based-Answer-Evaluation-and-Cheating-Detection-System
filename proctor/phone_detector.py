@@ -6,6 +6,7 @@ import cv2
 import os
 import numpy as np
 from .config import COCO_CLASSES, MODEL_PROTO_PATH, MODEL_WEIGHTS_PATH
+from .logger import logger
 
 class ObjectDetector:
 
@@ -19,10 +20,12 @@ class ObjectDetector:
         if os.path.exists(self.proto_path) and os.path.exists(self.weights_path):
             try:
                 self.net = cv2.dnn.readNetFromCaffe(self.proto_path, self.weights_path)
-                print("[OBJECT DETECTOR] DNN MobileNet-SSD Caffe model loaded successfully.")
+                logger.info("[OBJECT DETECTOR] DNN MobileNet-SSD Caffe model loaded successfully.")
             except Exception as e:
-                print("[OBJECT DETECTOR WARN] Could not load Caffe model:", e)
+                logger.warning(f"[OBJECT DETECTOR WARN] Could not load Caffe model: {e}. Falling back to contour detector.")
                 self.net = None
+        else:
+            logger.info("[OBJECT DETECTOR INFO] Caffe weights file not found. Using geometric contour detector.")
 
     def detect_objects(self, frame):
         """
@@ -55,8 +58,8 @@ class ObjectDetector:
                                 "label": label,
                                 "confidence": float(confidence)
                             })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"DNN object detection error: {e}")
 
         # 2. Geometric Phone Slab Contour Fallback
         if not detections:
@@ -81,7 +84,7 @@ class ObjectDetector:
                                     "confidence": 0.72
                                 })
                                 break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Contour object detection error: {e}")
 
         return detections

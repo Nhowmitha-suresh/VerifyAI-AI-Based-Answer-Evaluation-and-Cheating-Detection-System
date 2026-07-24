@@ -7,6 +7,7 @@ import math
 import collections
 import numpy as np
 from .config import HP_IDX, YAW_THRESHOLD, YAW_FULLTURN, PITCH_THRESHOLD, PITCH_LAP_GLANCE, MODEL_POINTS
+from .logger import logger
 
 class HeadPoseEstimator:
     def __init__(self):
@@ -74,5 +75,6 @@ class HeadPoseEstimator:
                 "roll": z,
                 "axis_pts": (p1, p2)
             }
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Head pose solvePnP estimation error: {e}")
             return {"head_status": "NORMAL", "headturn": False, "fullturn": False, "lap_glance": False, "axis_pts": None}

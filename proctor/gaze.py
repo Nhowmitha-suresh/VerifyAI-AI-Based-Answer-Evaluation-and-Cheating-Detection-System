@@ -6,6 +6,7 @@ import collections
 import numpy as np
 from .config import LEFT_IRIS_IDX, RIGHT_IRIS_IDX, GLANCE_THRESHOLD, GLANCE_SUSTAIN, RAPID_SCAN_VELOCITY
 from .utils import normalized_iris_center
+from .logger import logger
 
 class GazeTracker:
     def __init__(self, calib_center=(0.5, 0.5)):
@@ -74,7 +75,8 @@ class GazeTracker:
                 "Lc": Lc,
                 "Rc": Rc
             }
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Gaze processing exception: {e}")
             return {
                 "gaze_direction": "CENTER",
                 "offscreen": False,
