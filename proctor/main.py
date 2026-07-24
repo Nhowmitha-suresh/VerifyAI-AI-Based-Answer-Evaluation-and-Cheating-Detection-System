@@ -64,7 +64,14 @@ def main():
                 max_num_hands=2,
                 min_detection_confidence=0.5
             ) if ENABLE_HANDS else None
-        logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized cleanly.")
+
+            # Warmup first frame inside SilenceFD to capture lazy C++ graph compilation dumps!
+            dummy_rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+            face_mesh.process(dummy_rgb)
+            if hands:
+                hands.process(dummy_rgb)
+
+        logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized & warmed up cleanly.")
 
         logger.info("[STARTUP] [3/10] Initializing CameraManager...")
         camera = CameraManager(width=CAM_W, height=CAM_H)
