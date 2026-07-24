@@ -5,10 +5,12 @@ Central Configuration & Tuning Thresholds for AI Proctoring Engine.
 import os
 import numpy as np
 
-# Camera Resolution
+# Camera Resolution & Discovery Configuration
 CAM_W = 1280
 CAM_H = 720
 PROCESS_EVERY_N = 2
+CAMERA_INDEXES = [0, 1, 2, 3, 4]
+VERIFICATION_WINDOW_SEC = 3.0
 
 # Feature Toggles
 ENABLE_HANDS = True
