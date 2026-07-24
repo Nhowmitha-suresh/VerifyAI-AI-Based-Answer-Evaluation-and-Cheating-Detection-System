@@ -3,6 +3,7 @@ Central Configuration & Tuning Thresholds for AI Proctoring Engine.
 """
 
 import os
+import numpy as np
 
 # Camera Resolution
 CAM_W = 1280
@@ -19,6 +20,19 @@ SNAPSHOT_DIR = "snapshots"
 CSV_FILE = "proctor_log.csv"
 REPORT_FILE = "proctor_report.html"
 
+# Object Detection Model Paths & Classes
+MODEL_PROTO_PATH = "mobile_net_ssd.prototxt"
+MODEL_WEIGHTS_PATH = "mobile_net_ssd.caffemodel"
+COCO_CLASSES = {
+    67: "cell phone", 73: "book", 63: "laptop", 65: "remote", 64: "mouse", 66: "keyboard"
+}
+
+# Audio Configuration
+AUDIO_RATE = 16000
+AUDIO_CHANNELS = 1
+AUDIO_BLOCK_MS = 200
+TTS_RATE = 155
+
 # Scoring Windows & Alarm Thresholds
 EVENT_WINDOW = 12.0  # Sliding window duration in seconds
 ALARM_MEDIUM = 15.0  # Medium risk alert threshold
@@ -29,11 +43,20 @@ GLANCE_THRESHOLD = 0.18  # Normalized iris center deviation
 GLANCE_SUSTAIN = 1.0     # Seconds required for offscreen trigger
 RAPID_SCAN_VELOCITY = 0.45
 
-# Head Pose Thresholds (Degrees)
+# Head Pose Thresholds & Model Geometry
 YAW_THRESHOLD = 20.0
 YAW_FULLTURN = 38.0
 PITCH_THRESHOLD = 18.0
 PITCH_LAP_GLANCE = 20.0
+
+MODEL_POINTS = np.array([
+    (0.0, 0.0, 0.0),             # Nose tip
+    (0.0, -330.0, -65.0),        # Chin
+    (-225.0, 170.0, -135.0),     # Left eye outer corner
+    (225.0, 170.0, -135.0),      # Right eye outer corner
+    (-150.0, -150.0, -125.0),    # Left mouth corner
+    (150.0, -150.0, -125.0)      # Right mouth corner
+], dtype=np.float64)
 
 # Drowsiness / Eye Aspect Ratio (EAR)
 EAR_CLOSED_THRESH = 0.15

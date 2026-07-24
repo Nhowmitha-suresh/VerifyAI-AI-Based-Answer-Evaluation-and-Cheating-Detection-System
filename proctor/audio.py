@@ -7,7 +7,10 @@ import time
 import threading
 import collections
 import numpy as np
-from .config import MOUTH_OPEN_THRESHOLD, AUDIO_RMS_THRESHOLD, VAD_WINDOW
+from .config import (
+    MOUTH_OPEN_THRESHOLD, AUDIO_RMS_THRESHOLD, VAD_WINDOW,
+    TTS_RATE, AUDIO_RATE, AUDIO_CHANNELS, AUDIO_BLOCK_MS
+)
 
 try:
     import sounddevice as sd
@@ -26,7 +29,7 @@ if sys.platform == "win32":
 try:
     import pyttsx3
     tts_engine = pyttsx3.init()
-    tts_engine.setProperty("rate", 155)
+    tts_engine.setProperty("rate", TTS_RATE)
 except Exception:
     tts_engine = None
 
@@ -89,7 +92,7 @@ def stop_alerts():
 
 
 class AudioMonitor:
-    def __init__(self, rate=16000, channels=1, block_ms=200):
+    def __init__(self, rate=AUDIO_RATE, channels=AUDIO_CHANNELS, block_ms=AUDIO_BLOCK_MS):
         self.rate = rate
         self.channels = channels
         self.block_ms = block_ms

@@ -6,16 +6,7 @@ import cv2
 import math
 import collections
 import numpy as np
-from .config import HP_IDX, YAW_THRESHOLD, YAW_FULLTURN, PITCH_THRESHOLD, PITCH_LAP_GLANCE
-
-MODEL_POINTS = np.array([
-    (0.0, 0.0, 0.0),             # Nose tip
-    (0.0, -330.0, -65.0),        # Chin
-    (-225.0, 170.0, -135.0),     # Left eye outer corner
-    (225.0, 170.0, -135.0),      # Right eye outer corner
-    (-150.0, -150.0, -125.0),    # Left mouth corner
-    (150.0, -150.0, -125.0)      # Right mouth corner
-], dtype=np.float64)
+from .config import HP_IDX, YAW_THRESHOLD, YAW_FULLTURN, PITCH_THRESHOLD, PITCH_LAP_GLANCE, MODEL_POINTS
 
 class HeadPoseEstimator:
     def __init__(self):

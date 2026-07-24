@@ -5,16 +5,14 @@ Mobile Phone & Forbidden Object AI Detection Module.
 import cv2
 import os
 import numpy as np
+from .config import COCO_CLASSES, MODEL_PROTO_PATH, MODEL_WEIGHTS_PATH
 
 class ObjectDetector:
-    COCO_CLASSES = {
-        67: "cell phone", 73: "book", 63: "laptop", 65: "remote", 64: "mouse", 66: "keyboard"
-    }
 
     def __init__(self):
         self.net = None
-        self.proto_path = "mobile_net_ssd.prototxt"
-        self.weights_path = "mobile_net_ssd.caffemodel"
+        self.proto_path = MODEL_PROTO_PATH
+        self.weights_path = MODEL_WEIGHTS_PATH
         self._init_model()
 
     def _init_model(self):
@@ -48,8 +46,8 @@ class ObjectDetector:
                     confidence = out[0, 0, i, 2]
                     if confidence > 0.40:
                         idx = int(out[0, 0, i, 1])
-                        if idx in self.COCO_CLASSES or idx == 67:
-                            label = self.COCO_CLASSES.get(idx, "cell phone")
+                        if idx in COCO_CLASSES or idx == 67:
+                            label = COCO_CLASSES.get(idx, "cell phone")
                             box = out[0, 0, i, 3:7] * np.array([w, h, w, h])
                             (startX, startY, endX, endY) = box.astype("int")
                             detections.append({
