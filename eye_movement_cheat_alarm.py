@@ -15,16 +15,19 @@ Features:
 - Log Export (CSV) & Interactive HTML Audit Report (`proctor_report.html`)
 """
 
+import os
+# Suppress verbose C++ MediaPipe / TensorFlow protobuf logging
+os.environ["GLOG_minloglevel"] = "2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 import cv2
 import time
 import math
 import threading
-import os
 import csv
 import sys
 import collections
 import datetime
-import urllib.request
 import numpy as np
 
 # OS-Specific Active Window Tracking (Windows Native)
@@ -175,10 +178,6 @@ def get_active_window_title():
 
 # -------------------- MOBILE PHONE & OBJECT DETECTOR --------------------
 class ObjectDetector:
-    """
-    Mobile Phone & Forbidden Object Detector using OpenCV DNN (MobileNet-SSD COCO)
-    + Geometric Phone Contour Heuristics fallback.
-    """
     COCO_CLASSES = {
         67: "cell phone", 73: "book", 63: "laptop", 65: "remote", 64: "mouse", 66: "keyboard"
     }
@@ -190,7 +189,6 @@ class ObjectDetector:
         self._init_model()
 
     def _init_model(self):
-        # Lightweight MobileNetSSD model auto-loader if present
         if os.path.exists(self.proto_path) and os.path.exists(self.weights_path):
             try:
                 self.net = cv2.dnn.readNetFromCaffe(self.proto_path, self.weights_path)
@@ -200,9 +198,6 @@ class ObjectDetector:
                 self.net = None
 
     def detect_objects(self, frame):
-        """
-        Returns list of detected objects: [{"box": (x, y, w, h), "label": str, "confidence": float}]
-        """
         detections = []
         h, w = frame.shape[:2]
 
@@ -216,7 +211,7 @@ class ObjectDetector:
                     confidence = out[0, 0, i, 2]
                     if confidence > 0.40:
                         idx = int(out[0, 0, i, 1])
-                        if idx in self.COCO_CLASSES or idx == 67: # Cell phone class
+                        if idx in self.COCO_CLASSES or idx == 67:
                             label = self.COCO_CLASSES.get(idx, "cell phone")
                             box = out[0, 0, i, 3:7] * np.array([w, h, w, h])
                             (startX, startY, endX, endY) = box.astype("int")
@@ -228,7 +223,7 @@ class ObjectDetector:
             except Exception:
                 pass
 
-        # Geometric Phone Shape Heuristic (Detecting dark rectangular slab held near hand or lower screen)
+        # Geometric Phone Shape Heuristic Fallback
         if not detections:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             blur = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -240,9 +235,7 @@ class ObjectDetector:
                 if 2500 < area < 45000:
                     x, y, cw, ch = cv2.boundingRect(c)
                     aspect_ratio = float(ch) / max(1, cw)
-                    # Phone aspect ratio typically 1.6 to 2.3 (vertical) or 0.4 to 0.6 (horizontal)
                     if (1.5 <= aspect_ratio <= 2.4 or 0.42 <= aspect_ratio <= 0.65) and (y > h * 0.25):
-                        # Rectangularity check
                         rect_area = cw * ch
                         extent = float(area) / rect_area
                         if extent > 0.70:
@@ -640,20 +633,23 @@ def main():
     hands = mp_hands.Hands(max_num_hands=2, min_detection_confidence=0.5) if ENABLE_HANDS else None
     object_detector = ObjectDetector() if ENABLE_OBJECT_DETECTION else None
 
+    # Target Primary Camera 0 cleanly
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not cap or not cap.isOpened():
+        cap = cv2.VideoCapture(0)
+
+    if not cap or not cap.isOpened():
+        print("[ERROR] Cannot access webcam device. Please check camera connection.")
+        sys.exit(1)
+
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAM_W)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAM_H)
     time.sleep(0.2)
-
-    if not cap.isOpened():
-        print("[ERROR] Cannot access webcam device.")
-        sys.exit(1)
 
     audio_mon = AudioMonitor() if ENABLE_AUDIO else None
     if audio_mon:
         audio_mon.start()
 
-    # Initial Active Window Title
     initial_window = get_active_window_title()
 
     # Calibration phase
@@ -676,9 +672,12 @@ def main():
                 pass
         cv2.putText(frame, "CALIBRATING GAZE CENTER... LOOK STRAIGHT", (w//2 - 250, h//2),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 255), 2)
-        cv2.imshow("Proctoring System", frame)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+        try:
+            cv2.imshow("Proctoring System", frame)
+            if cv2.waitKey(1) & 0xFF == 27:
+                break
+        except Exception:
+            pass
 
     calib_center = np.mean(calib_samples, axis=0) if calib_samples else (0.5, 0.5)
     print("[CALIBRATION COMPLETE] Center baseline:", calib_center)
@@ -700,8 +699,11 @@ def main():
     gaze_pos_history = collections.deque(maxlen=15)
     luminance_history = collections.deque(maxlen=20)
 
-    cv2.namedWindow("Proctoring System", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Proctoring System", 1280, 720)
+    try:
+        cv2.namedWindow("Proctoring System", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Proctoring System", 1280, 720)
+    except Exception:
+        pass
 
     last_high_snapshot = 0
     last_phone_snapshot = 0
@@ -988,26 +990,31 @@ def main():
             draw_telemetry_panel(frame, telemetry_flags)
             draw_event_feed(frame, events)
 
-            cv2.imshow("Proctoring System", frame)
-            
-            # Key Bindings
-            k = cv2.waitKey(1) & 0xFF
-            if k == 27 or k == ord('q') or k == ord('Q'):
-                break
-            elif k == ord('c') or k == ord('C'):
-                calib_center = (ema_nx, ema_ny)
-                print("[HOTKEY] Recalibrated gaze baseline to:", calib_center)
-            elif k == ord('r') or k == ord('R'):
-                events.clear()
-                print("[HOTKEY] Reset risk score.")
-            elif k == ord('s') or k == ord('S'):
-                save_snapshot(frame, reason="manual")
+            try:
+                cv2.imshow("Proctoring System", frame)
+                k = cv2.waitKey(1) & 0xFF
+                if k == 27 or k == ord('q') or k == ord('Q'):
+                    break
+                elif k == ord('c') or k == ord('C'):
+                    calib_center = (ema_nx, ema_ny)
+                    print("[HOTKEY] Recalibrated gaze baseline to:", calib_center)
+                elif k == ord('r') or k == ord('R'):
+                    events.clear()
+                    print("[HOTKEY] Reset risk score.")
+                elif k == ord('s') or k == ord('S'):
+                    save_snapshot(frame, reason="manual")
+            except Exception:
+                pass
 
     finally:
         if audio_mon:
             audio_mon.stop()
-        cap.release()
-        cv2.destroyAllWindows()
+        if cap:
+            cap.release()
+        try:
+            cv2.destroyAllWindows()
+        except Exception:
+            pass
         face_mesh.close()
         if hands: hands.close()
         
