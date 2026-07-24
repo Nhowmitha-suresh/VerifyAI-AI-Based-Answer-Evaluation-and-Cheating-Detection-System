@@ -9,7 +9,12 @@ import cv2
 import ctypes
 import collections
 import numpy as np
-import mediapipe as mp
+
+from .utils import SilenceFD, calculate_ear
+
+# Silence MediaPipe C++ graph dumps during import and solution creation
+with SilenceFD():
+    import mediapipe as mp
 
 from .config import (
     CAM_W, CAM_H, PROCESS_EVERY_N, ENABLE_HANDS, ENABLE_OBJECT_DETECTION, ENABLE_AUDIO,
@@ -19,7 +24,6 @@ from .config import (
     WEIGHT_FULLTURN, WEIGHT_HAND_NEAR, WEIGHT_MULTIFACE, WEIGHT_OCCLUSION,
     WEIGHT_OTHERVOICE, WEIGHT_EYES_CLOSED
 )
-from .utils import SilenceFD, calculate_ear
 from .camera import CameraManager
 from .gaze import GazeTracker
 from .headpose import HeadPoseEstimator
@@ -46,7 +50,6 @@ def get_active_window_title():
 def main():
     logger.info("Initializing MediaPipe Solutions with C-level graph silencing...")
     
-    # Silence MediaPipe C++ FaceLandmarkFrontCpu graph dumps to stdout/stderr
     with SilenceFD():
         face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=2,
@@ -116,7 +119,6 @@ def main():
     occ_buf = collections.deque()
     mf_buf = collections.deque()
     ear_buf = collections.deque()
-    luminance_history = collections.deque(maxlen=20)
 
     try:
         cv2.namedWindow("Proctoring System", cv2.WINDOW_NORMAL)
@@ -157,7 +159,7 @@ def main():
 
             offscreen_flag = headturn_flag = fullturn_flag = handnear_flag = False
             multiface_flag = occlusion_flag = othervoice_flag = eyes_closed_flag = False
-            phone_flag = window_switch_flag = rapid_scan_flag = lap_glance_flag = glow_flag = False
+            phone_flag = window_switch_flag = rapid_scan_flag = lap_glance_flag = False
 
             gaze_str, head_str, face_str, hand_str, audio_str, ear_str = "CENTER", "NORMAL", "1 Face", "CLEAR", "QUIET", "ACTIVE"
             phone_str, window_str = "CLEAR", "FOCUSED"
