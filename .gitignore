@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Proctoring output logs & evidence snapshots
+snapshots/
+proctor_log.csv
+proctor_report.html
+
+# Caffe / DNN downloaded model weights
+*.caffemodel
+*.onnx
+
+# Virtual environments & IDEs
+venv/
+.venv/
+env/
+.idea/
+.vscode/
