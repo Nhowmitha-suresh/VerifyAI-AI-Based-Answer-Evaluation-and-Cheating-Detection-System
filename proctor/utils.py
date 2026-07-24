@@ -1,24 +1,41 @@
 """
-Utility Functions & OS File Descriptor Redirector for C++ Log Silencing.
+Utility Functions & OS File Descriptor / Win32 Kernel Redirector for C++ Log Silencing.
 """
 
 import os
 import sys
 import math
+import ctypes
 import numpy as np
 
 class SilenceFD:
     """
-    Context manager that redirects OS-level file descriptors 1 (stdout) and 2 (stderr)
-    to os.devnull. This completely silences C++ protobuf graph logging from MediaPipe/TensorFlow.
+    Context manager that redirects OS-level file descriptors 1 (stdout) & 2 (stderr)
+    AND Win32 OS Kernel STD_OUTPUT_HANDLE & STD_ERROR_HANDLE to NUL device.
+    This 100% silences C++ protobuf calculator graph logging from MediaPipe/TensorFlow on Windows.
     """
     def __init__(self):
         self._enabled = True
+        self._win32 = (sys.platform == "win32")
 
     def __enter__(self):
         try:
             sys.stdout.flush()
             sys.stderr.flush()
+
+            # Win32 OS Kernel Handle Redirection
+            if self._win32:
+                try:
+                    kernel32 = ctypes.windll.kernel32
+                    self._h_out_orig = kernel32.GetStdHandle(-11)
+                    self._h_err_orig = kernel32.GetStdHandle(-12)
+                    self._h_null = kernel32.CreateFileW("NUL", 0xc0000000, 3, None, 3, 0, None)
+                    kernel32.SetStdHandle(-11, self._h_null)
+                    kernel32.SetStdHandle(-12, self._h_null)
+                except Exception:
+                    pass
+
+            # C-Runtime (CRT) File Descriptor Redirection
             self._null_fd = os.open(os.devnull, os.O_RDWR)
             self._stdout_save = os.dup(1)
             self._stderr_save = os.dup(2)
@@ -36,6 +53,15 @@ class SilenceFD:
                 os.close(self._stdout_save)
                 os.close(self._stderr_save)
                 os.close(self._null_fd)
+
+                if self._win32:
+                    try:
+                        kernel32 = ctypes.windll.kernel32
+                        kernel32.SetStdHandle(-11, self._h_out_orig)
+                        kernel32.SetStdHandle(-12, self._h_err_orig)
+                        kernel32.CloseHandle(self._h_null)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
