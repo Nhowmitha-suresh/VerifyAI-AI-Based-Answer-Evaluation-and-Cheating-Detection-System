@@ -40,6 +40,25 @@ from .analytics import SessionAnalytics
 from .report import generate_html_report
 
 
+import urllib.request
+import json
+import threading
+
+def sync_telemetry_to_backend(payload):
+    def _post():
+        try:
+            req = urllib.request.Request(
+                "http://localhost:8000/api/telemetry/update",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            urllib.request.urlopen(req, timeout=0.5)
+        except Exception:
+            pass
+    threading.Thread(target=_post, daemon=True).start()
+
+
 def get_active_window_title():
     if sys.platform == "win32":
         try:
@@ -356,6 +375,13 @@ def main():
             risk_eval = behavior_engine.evaluate_telemetry(telemetry_flags, now)
             score = risk_eval["risk_score"]
             explanation = risk_eval["explanation"]
+
+            sync_telemetry_to_backend({
+                **telemetry_flags,
+                "risk_score": score,
+                "severity": risk_eval["severity"],
+                "explanation": explanation
+            })
 
             # Trigger Incident Video Recording on High Risk
             if score >= ALARM_HIGH and (now - last_incident_trigger > 12.0):

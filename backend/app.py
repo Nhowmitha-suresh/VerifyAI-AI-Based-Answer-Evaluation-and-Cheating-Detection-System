@@ -28,7 +28,7 @@ from proctor.streaming import streamer
 
 if HAS_FASTAPI:
     app = FastAPI(
-        title="NegoSphere AI Proctoring Platform API",
+        title="VerifyAI Proctoring Platform API",
         description="REST & WebSockets Backend for Remote Candidate Exam Monitoring",
         version="2.0.0"
     )
@@ -44,9 +44,32 @@ if HAS_FASTAPI:
     if os.path.exists(SNAPSHOT_DIR):
         app.mount("/snapshots", StaticFiles(directory=SNAPSHOT_DIR), name="snapshots")
 
+    latest_telemetry_state = {
+        "phone_status": "CLEAR", "phone_detected": False,
+        "window_status": "FOCUSED", "window_switched": False,
+        "gaze_status": "CENTER", "offscreen": False, "rapid_scan": False,
+        "head_status": "NORMAL", "headturn": False, "lap_glance": False,
+        "face_status": "VERIFIED", "multiface": False, "occlusion": False,
+        "hand_status": "CLEAR", "handnear": False,
+        "audio_status": "QUIET", "othervoice": False,
+        "ear_status": "ACTIVE", "eyes_closed": False,
+        "risk_score": 0.0, "severity": "NORMAL",
+        "explanation": "Candidate behavior normal and centered."
+    }
+
     @app.get("/api/health")
     def health_check():
-        return {"status": "ONLINE", "system": "NegoSphere AI Proctoring Engine", "timestamp": time.time()}
+        return {"status": "ONLINE", "system": "VerifyAI Proctoring Engine", "timestamp": time.time()}
+
+    @app.post("/api/telemetry/update")
+    def update_telemetry(payload: Dict[str, Any]):
+        latest_telemetry_state.update(payload)
+        streamer.broadcast_sync(latest_telemetry_state)
+        return {"status": "OK"}
+
+    @app.get("/api/telemetry/live")
+    def get_live_telemetry():
+        return latest_telemetry_state
 
     @app.get("/api/session/status")
     def get_session_status():
@@ -54,7 +77,8 @@ if HAS_FASTAPI:
             "active": True,
             "total_events": len(all_logged_events),
             "peak_score": max([e["total"] for e in all_logged_events], default=0.0),
-            "latest_event": all_logged_events[-1] if all_logged_events else None
+            "latest_event": all_logged_events[-1] if all_logged_events else None,
+            "telemetry": latest_telemetry_state
         }
 
     @app.get("/api/events")
