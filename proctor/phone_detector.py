@@ -1,13 +1,14 @@
 """
 Mobile Phone & Prohibited Multi-Gadget AI Detection Module.
-Uses OpenCV DNN MobileNet-SSD COCO and adaptive geometric contour heuristics to detect cell phones, books, tablets & electronic devices.
+Uses OpenCV DNN MobileNet-SSD COCO, Non-Maximum Suppression (NMS), and IoU Tracker for persistent box smoothing.
 """
 
 import cv2
 import os
 import numpy as np
 from typing import List, Dict, Any
-from .config import COCO_CLASSES, MODEL_PROTO_PATH, MODEL_WEIGHTS_PATH
+from .config import COCO_CLASSES, MODEL_PROTO_PATH, MODEL_WEIGHTS_PATH, OBJECT_CONF_THRESHOLD, NMS_THRESHOLD
+from .tracker import IoUTracker
 from .logger import logger
 
 
@@ -17,6 +18,7 @@ class ObjectDetector:
         self.net = None
         self.proto_path = MODEL_PROTO_PATH
         self.weights_path = MODEL_WEIGHTS_PATH
+        self.tracker = IoUTracker(iou_threshold=0.35, max_stale=5)
         self._init_model()
 
     def _init_model(self):
@@ -32,12 +34,16 @@ class ObjectDetector:
 
     def detect_objects(self, frame: np.ndarray) -> List[Dict[str, Any]]:
         """
-        Process frame and return list of detected prohibited objects:
-        [{"box": (x, y, w, h), "label": str, "confidence": float}]
+        Process frame with NMS box filtering and IoU tracking.
+        Returns list of tracked detections:
+        [{"track_id": int, "box": (x, y, w, h), "label": str, "confidence": float, "consecutive_frames": int}]
         """
-        detections = []
+        raw_boxes = []
+        raw_confidences = []
+        raw_labels = []
+
         if frame is None or frame.size == 0:
-            return detections
+            return []
 
         h, w = frame.shape[:2]
 
@@ -49,23 +55,36 @@ class ObjectDetector:
                 out = self.net.forward()
                 
                 for i in range(out.shape[2]):
-                    confidence = out[0, 0, i, 2]
-                    if confidence > 0.35:
+                    confidence = float(out[0, 0, i, 2])
+                    if confidence >= OBJECT_CONF_THRESHOLD:
                         idx = int(out[0, 0, i, 1])
-                        if idx in COCO_CLASSES or idx == 67 or idx == 73:
+                        if idx in COCO_CLASSES or idx in [67, 73, 63, 65, 64, 66, 77]:
                             label = COCO_CLASSES.get(idx, "cell phone")
                             box = out[0, 0, i, 3:7] * np.array([w, h, w, h])
                             (startX, startY, endX, endY) = box.astype("int")
-                            detections.append({
-                                "box": (startX, startY, endX - startX, endY - startY),
-                                "label": label,
-                                "confidence": float(confidence)
-                            })
+                            bw = max(1, endX - startX)
+                            bh = max(1, endY - startY)
+                            raw_boxes.append([startX, startY, bw, bh])
+                            raw_confidences.append(confidence)
+                            raw_labels.append(label)
             except Exception as e:
                 logger.debug(f"DNN object detection error: {e}")
 
-        # 2. Geometric Phone Slab / Tablet Contour Fallback
-        if not detections:
+        # 2. Non-Maximum Suppression (NMS) Filtering
+        nms_detections = []
+        if raw_boxes:
+            indices = cv2.dnn.NMSBoxes(raw_boxes, raw_confidences, OBJECT_CONF_THRESHOLD, NMS_THRESHOLD)
+            if len(indices) > 0:
+                indices = indices.flatten()
+                for idx in indices:
+                    nms_detections.append({
+                        "box": tuple(raw_boxes[idx]),
+                        "label": raw_labels[idx],
+                        "confidence": raw_confidences[idx]
+                    })
+
+        # 3. Geometric Phone Slab Contour Fallback if DNN produces no candidates
+        if not nms_detections:
             try:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 blur = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -77,12 +96,11 @@ class ObjectDetector:
                     if 2500 < area < 45000:
                         x, y, cw, ch = cv2.boundingRect(c)
                         aspect_ratio = float(ch) / max(1, cw)
-                        # Phone vertical/horizontal aspect ratios
                         if (1.5 <= aspect_ratio <= 2.4 or 0.42 <= aspect_ratio <= 0.65) and (y > h * 0.20):
                             rect_area = cw * ch
                             extent = float(area) / rect_area
                             if extent > 0.70:
-                                detections.append({
+                                nms_detections.append({
                                     "box": (x, y, cw, ch),
                                     "label": "cell phone",
                                     "confidence": 0.75
@@ -91,4 +109,6 @@ class ObjectDetector:
             except Exception as e:
                 logger.debug(f"Contour object detection error: {e}")
 
-        return detections
+        # 4. IoU Tracker Coordinate Smoothing & Persistent ID Assignment
+        tracked_results = self.tracker.update(nms_detections)
+        return tracked_results
