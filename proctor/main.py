@@ -203,6 +203,7 @@ def main():
 
         print("[PASS] STEP 10 - Entering Main Detection Loop (OpenCV Window Active)", flush=True)
         logger.info("[STARTUP] [10/10] Entering main detection loop...")
+        last_detections = []
 
         while True:
             ret, frame = camera.read()
@@ -225,14 +226,14 @@ def main():
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = None
             hands_res = None
-            detections = []
-
             if (frame_idx % PROCESS_EVERY_N) == 0:
                 results = face_mesh.process(rgb)
                 if ENABLE_HANDS and hands:
                     hands_res = hands.process(rgb)
                 if object_detector:
-                    detections = object_detector.detect_objects(frame)
+                    last_detections = object_detector.detect_objects(frame)
+
+            detections = last_detections
 
             offscreen_flag = headturn_flag = fullturn_flag = handnear_flag = False
             multiface_flag = occlusion_flag = othervoice_flag = eyes_closed_flag = False

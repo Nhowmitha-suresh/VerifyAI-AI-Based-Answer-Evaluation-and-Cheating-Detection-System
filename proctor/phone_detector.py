@@ -1,6 +1,6 @@
 """
 Mobile Phone & Prohibited Multi-Gadget AI Detection Module.
-Uses OpenCV DNN MobileNet-SSD COCO, Non-Maximum Suppression (NMS), and IoU Tracker for persistent box smoothing.
+Uses OpenCV DNN MobileNet-SSD, Non-Maximum Suppression (NMS), and IoU Tracker for persistent box smoothing.
 """
 
 import cv2
@@ -14,6 +14,18 @@ from .logger import logger
 
 PROTO_URL = "https://raw.githubusercontent.com/chuanqi305/MobileNet-SSD/master/voc/MobileNetSSD_deploy.prototxt"
 CAFFE_URL = "https://raw.githubusercontent.com/PINTO0309/MobileNet-SSD-RealSense/master/caffemodel/MobileNetSSD/MobileNetSSD_deploy.caffemodel"
+
+# Pascal VOC 20-class mappings used by MobileNet-SSD Caffe model
+VOC_CLASSES = {
+    0: "background", 1: "aeroplane", 2: "bicycle", 3: "bird", 4: "boat",
+    5: "bottle", 6: "bus", 7: "car", 8: "cat", 9: "chair",
+    10: "cow", 11: "diningtable", 12: "dog", 13: "horse", 14: "motorbike",
+    15: "person", 16: "pottedplant", 17: "sheep", 18: "sofa", 19: "train",
+    20: "tvmonitor"
+}
+
+# Target prohibited gadget indices (TV/Monitor/Screen: 20, Bottle/Gadget: 5, Chair/Desk item: 9, Motorbike/Tech: 14)
+TARGET_PROHIBITED_INDICES = {20, 5, 9, 14, 67, 73, 63, 65, 64, 66, 77}
 
 
 class ObjectDetector:
@@ -81,14 +93,24 @@ class ObjectDetector:
                 blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
                 self.net.setInput(blob)
                 out = self.net.forward()
-                
+
+                top_conf = 0.0
                 for i in range(out.shape[2]):
                     confidence = float(out[0, 0, i, 2])
+                    idx = int(out[0, 0, i, 1])
+
+                    if confidence > top_conf and idx != 15 and idx != 0:
+                        top_conf = confidence
+
                     if confidence >= OBJECT_CONF_THRESHOLD:
-                        idx = int(out[0, 0, i, 1])
-                        # Detect cell phone (15/67/77), book (73), laptop (63), remote (65)
-                        if idx in COCO_CLASSES or idx in [15, 67, 73, 63, 65, 64, 66, 77]:
-                            label = COCO_CLASSES.get(idx, "cell phone")
+                        # Match prohibited objects: VOC class 20 (tvmonitor/screen), bottle (5), or COCO cell phone (67)
+                        if idx in TARGET_PROHIBITED_INDICES or idx in VOC_CLASSES:
+                            label = "cell phone" if (idx in [20, 5, 67, 77] or VOC_CLASSES.get(idx) == "tvmonitor") else COCO_CLASSES.get(idx, VOC_CLASSES.get(idx, "cell phone"))
+                            
+                            # Filter out full-body person detections (idx 15) unless small hand gadget
+                            if idx == 15 and (out[0, 0, i, 5] - out[0, 0, i, 3]) > 0.6:
+                                continue
+
                             box = out[0, 0, i, 3:7] * np.array([w, h, w, h])
                             (startX, startY, endX, endY) = box.astype("int")
                             bw = max(1, endX - startX)
@@ -96,6 +118,7 @@ class ObjectDetector:
                             raw_boxes.append([startX, startY, bw, bh])
                             raw_confidences.append(confidence)
                             raw_labels.append(label)
+
             except Exception as e:
                 logger.debug(f"DNN object detection error: {e}")
 
