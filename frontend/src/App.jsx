@@ -212,7 +212,7 @@ export default function App() {
                 <div>AI PROCTOR HUD ACTIVE • {fps} FPS</div>
                 <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
                   Face Conf: <span style={{ color: '#10b981' }}>{(telemetry.face_confidence ? (telemetry.face_confidence * 100).toFixed(0) : '98')}%</span> | 
-                  Phone Conf: <span style={{ color: telemetry.phone_detected ? '#ef4444' : '#10b981' }}>{telemetry.phone_detected ? '88%' : '0%'}</span>
+                  Phone Conf: <span style={{ color: telemetry.phone_detected ? '#ef4444' : '#10b981' }}>{(telemetry.phone_confidence ? (telemetry.phone_confidence * 100).toFixed(0) : (telemetry.phone_detected ? '88' : '0'))}%</span>
                 </div>
               </div>
 
@@ -260,7 +260,7 @@ export default function App() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <TelemetryRow icon={Monitor} label="Mobile Phone AI" val={telemetry.phone_status} isAlert={telemetry.phone_detected} conf={telemetry.phone_detected ? "88%" : null} />
+              <TelemetryRow icon={Monitor} label="Mobile Phone AI" val={telemetry.phone_status} isAlert={telemetry.phone_detected} conf={telemetry.phone_confidence ? (telemetry.phone_confidence * 100).toFixed(0) + '%' : (telemetry.phone_detected ? "88%" : "0%")} />
               <TelemetryRow icon={Activity} label="Window Focus" val={telemetry.window_status} isAlert={telemetry.window_switched} />
               <TelemetryRow icon={Eye} label="Gaze Direction" val={telemetry.gaze_status} isAlert={telemetry.offscreen || telemetry.rapid_scan} />
               <TelemetryRow icon={User} label="Head Orientation" val={telemetry.head_status} isAlert={telemetry.headturn || telemetry.lap_glance} />

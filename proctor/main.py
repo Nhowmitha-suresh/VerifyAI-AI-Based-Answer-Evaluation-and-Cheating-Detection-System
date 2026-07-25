@@ -240,6 +240,7 @@ def main():
 
             gaze_str, head_str, face_str, hand_str, audio_str, ear_str = "CENTER", "NORMAL", "1 Face", "CLEAR", "QUIET", "ACTIVE"
             phone_str, window_str = "CLEAR", "FOCUSED"
+            phone_conf = 0.0
 
             # 1. MOBILE PHONE & FORBIDDEN OBJECT DETECTION
             if detections:
@@ -250,6 +251,7 @@ def main():
                     
                     if label in ["cell phone", "mobile phone"]:
                         phone_flag = True
+                        phone_conf = max(phone_conf, conf)
                         phone_str = f"PHONE ({int(conf*100)}%)"
                         cv2.rectangle(frame, (bx, by), (bx + bw, by + bh), (0, 0, 255), 3)
                         cv2.putText(frame, f"MOBILE PHONE {int(conf*100)}%", (bx, max(20, by - 8)),
@@ -361,7 +363,7 @@ def main():
                     audio_str = "QUIET"
 
             telemetry_flags = {
-                "phone_status": phone_str, "phone_detected": phone_flag,
+                "phone_status": phone_str, "phone_detected": phone_flag, "phone_confidence": float(phone_conf),
                 "window_status": window_str, "window_switched": window_switch_flag,
                 "gaze_status": gaze_str, "offscreen": offscreen_flag, "rapid_scan": rapid_scan_flag,
                 "head_status": head_str, "headturn": headturn_flag or fullturn_flag, "lap_glance": lap_glance_flag,
