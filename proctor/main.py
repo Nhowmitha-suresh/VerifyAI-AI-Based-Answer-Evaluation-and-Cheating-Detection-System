@@ -55,9 +55,11 @@ def get_active_window_title():
 
 
 def main():
+    print("[PASS] STEP 1 - Starting AI Proctoring Application Engine...", flush=True)
     logger.info("[STARTUP] [1/10] Starting AI Proctoring Application Engine...")
     
     try:
+        print("[PASS] STEP 2 - Initializing MediaPipe FaceMesh & Hands Solutions...", flush=True)
         logger.info("[STARTUP] [2/10] Initializing MediaPipe FaceMesh & Hands Solutions...")
         with SilenceFD():
             face_mesh = mp.solutions.face_mesh.FaceMesh(
@@ -77,21 +79,27 @@ def main():
             if hands:
                 hands.process(dummy_rgb)
 
+        print("[PASS] STEP 2 - MediaPipe Solutions Initialized & Warmed Up", flush=True)
         logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized & warmed up cleanly.")
 
+        print("[PASS] STEP 3 - Initializing CameraManager...", flush=True)
         logger.info("[STARTUP] [3/10] Initializing CameraManager...")
         camera = CameraManager(width=CAM_W, height=CAM_H)
         camera.start()
+        print("[PASS] STEP 3 - CameraManager Started Successfully", flush=True)
         logger.info("[STARTUP] [3/10] CameraManager started successfully.")
 
+        print("[PASS] STEP 4 - Initializing GazeTracker & Heatmap Engine...", flush=True)
         logger.info("[STARTUP] [4/10] Initializing GazeTracker & Heatmap Engine...")
         gaze_tracker = GazeTracker()
         heatmap_tracker = GazeHeatmapTracker()
 
+        print("[PASS] STEP 5 - Initializing HeadPoseEstimator & Identity Verifier...", flush=True)
         logger.info("[STARTUP] [5/10] Initializing HeadPoseEstimator & Identity Verifier...")
         head_pose_estimator = HeadPoseEstimator()
         identity_verifier = IdentityVerifier()
 
+        print("[PASS] STEP 6 - Initializing ObjectDetector...", flush=True)
         logger.info("[STARTUP] [6/10] Initializing ObjectDetector...")
         object_detector = None
         if ENABLE_OBJECT_DETECTION:
@@ -100,6 +108,7 @@ def main():
             except Exception as e:
                 logger.warning(f"ObjectDetector initialization failed: {e}. Subsystem disabled.")
 
+        print("[PASS] STEP 7 - Initializing AudioMonitor...", flush=True)
         logger.info("[STARTUP] [7/10] Initializing AudioMonitor...")
         audio_mon = None
         if ENABLE_AUDIO:
@@ -109,6 +118,7 @@ def main():
             except Exception as e:
                 logger.warning(f"AudioMonitor initialization failed: {e}. Subsystem disabled.")
 
+        print("[PASS] STEP 8 - Initializing Behavioral AI & Incident Buffer...", flush=True)
         logger.info("[STARTUP] [8/10] Initializing Behavioral AI & Incident Buffer...")
         behavior_engine = BehavioralRiskEngine()
         incident_recorder = IncidentRecorder()
@@ -117,6 +127,7 @@ def main():
         initial_window = get_active_window_title()
 
         # Calibration Phase
+        print("[PASS] STEP 9 - Calibration Starting...", flush=True)
         logger.info("[STARTUP] [9/10] Calibration starting...")
         calib_samples = []
         calib_start = time.time()
@@ -148,6 +159,7 @@ def main():
         if calib_samples:
             calib_center = np.mean(calib_samples, axis=0)
             gaze_tracker.calibrate((0.5 + calib_center[0], 0.5 + calib_center[1]))
+        print("[PASS] STEP 9 - Calibration & Identity Registration Completed", flush=True)
         logger.info("[STARTUP] [9/10] Baseline calibration & identity registration completed.")
 
         frame_idx = 0
@@ -170,6 +182,7 @@ def main():
         last_phone_snapshot = 0
         last_incident_trigger = 0
 
+        print("[PASS] STEP 10 - Entering Main Detection Loop (OpenCV Window Active)", flush=True)
         logger.info("[STARTUP] [10/10] Entering main detection loop...")
 
         while True:

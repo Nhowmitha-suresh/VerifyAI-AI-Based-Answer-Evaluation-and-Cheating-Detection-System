@@ -14,60 +14,32 @@ if sys.platform == "win32":
 class SilenceFD:
     """
     Context manager that redirects OS-level file descriptors 1 (stdout) & 2 (stderr)
-    AND Win32 OS Kernel STD_OUTPUT_HANDLE (-11) & STD_ERROR_HANDLE (-12) to NUL device.
-    This 100% silences C++ protobuf calculator graph logging from MediaPipe/TensorFlow on Windows.
+    to NUL device during MediaPipe solution loading.
     """
-    def __init__(self):
-        self._enabled = True
-        self._win32 = (sys.platform == "win32")
-
     def __enter__(self):
         try:
             sys.stdout.flush()
             sys.stderr.flush()
-
             self._null_fd = os.open(os.devnull, os.O_RDWR)
             self._stdout_save = os.dup(1)
             self._stderr_save = os.dup(2)
-
             os.dup2(self._null_fd, 1)
             os.dup2(self._null_fd, 2)
-
-            # Win32 OS Kernel Handle Redirection via msvcrt
-            if self._win32:
-                try:
-                    kernel32 = ctypes.windll.kernel32
-                    self._h_out_orig = kernel32.GetStdHandle(-11)
-                    self._h_err_orig = kernel32.GetStdHandle(-12)
-                    self._h_null = msvcrt.get_osfhandle(self._null_fd)
-                    kernel32.SetStdHandle(-11, self._h_null)
-                    kernel32.SetStdHandle(-12, self._h_null)
-                except Exception:
-                    pass
+            self._active = True
         except Exception:
-            self._enabled = False
+            self._active = False
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._enabled:
+        if getattr(self, "_active", False):
             try:
                 try:
-                    if self._win32:
+                    if sys.platform == "win32":
                         ctypes.cdll.msvcrt.fflush(0)
                 except Exception:
                     pass
-
                 sys.stdout.flush()
                 sys.stderr.flush()
-
-                if self._win32:
-                    try:
-                        kernel32 = ctypes.windll.kernel32
-                        kernel32.SetStdHandle(-11, self._h_out_orig)
-                        kernel32.SetStdHandle(-12, self._h_err_orig)
-                    except Exception:
-                        pass
-
                 os.dup2(self._stdout_save, 1)
                 os.dup2(self._stderr_save, 2)
                 os.close(self._stdout_save)
