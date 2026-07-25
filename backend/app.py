@@ -71,6 +71,24 @@ if HAS_FASTAPI:
     def get_live_telemetry():
         return latest_telemetry_state
 
+    @app.get("/api/video_feed")
+    def video_feed():
+        from fastapi.responses import StreamingResponse
+        import cv2
+        from proctor import main as proctor_main
+
+        def generate_frames():
+            while True:
+                frame = getattr(proctor_main, "current_processed_frame", None)
+                if frame is not None:
+                    ret, jpeg = cv2.imencode('.jpg', frame)
+                    if ret:
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                time.sleep(0.033)
+
+        return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
+
     @app.get("/api/session/status")
     def get_session_status():
         return {

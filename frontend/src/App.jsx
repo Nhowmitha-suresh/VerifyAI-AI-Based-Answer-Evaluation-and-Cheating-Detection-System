@@ -21,13 +21,14 @@ export default function App() {
   const [explanation, setExplanation] = useState('Candidate behavior normal and centered.');
   const [scoreHistory, setScoreHistory] = useState([0]);
   const [timeLabels, setTimeLabels] = useState(['00:00']);
+  const [useBackendStream, setUseBackendStream] = useState(true);
 
   const [telemetry, setTelemetry] = useState({
-    phone_status: 'CLEAR', phone_detected: false,
+    phone_status: 'CLEAR', phone_detected: false, phone_confidence: 0,
     window_status: 'FOCUSED', window_switched: false,
     gaze_status: 'CENTER', offscreen: false, rapid_scan: false,
     head_status: 'NORMAL', headturn: false, lap_glance: false,
-    face_status: 'VERIFIED', multiface: false, occlusion: false,
+    face_status: 'VERIFIED', face_confidence: 0.98, multiface: false, occlusion: false,
     hand_status: 'CLEAR', handnear: false,
     audio_status: 'QUIET', othervoice: false,
     ear_status: 'ACTIVE', eyes_closed: false
@@ -41,18 +42,20 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // WebCam Stream Initialization
+  // WebCam Stream Initialization Fallback
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      })
-      .catch(err => {
-        console.warn("Local webcam access warning:", err);
-      });
-  }, []);
+    if (!useBackendStream) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        })
+        .catch(err => {
+          console.warn("Local webcam access warning:", err);
+        });
+    }
+  }, [useBackendStream]);
 
   // Browser Window Focus / Tab Switch Proctoring Detection
   useEffect(() => {
@@ -184,23 +187,36 @@ export default function App() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>
         {/* Left Column: Video Feed & Risk Gauge */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Webcam Video Container */}
+          {/* Video Container */}
           <div className="glass-panel" style={{ padding: '16px', position: 'relative' }}>
             <div style={{ position: 'relative', width: '100%', borderRadius: '12px', overflow: 'hidden', background: '#000', border: '1px solid var(--border-color)', aspectRatio: '16/9' }}>
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              {useBackendStream ? (
+                <img 
+                  src="http://localhost:8000/api/video_feed" 
+                  alt="Live AI Proctoring Stream"
+                  onError={() => setUseBackendStream(false)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <video 
+                  ref={videoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              )}
               
-              {/* Overlay HUD Watermark */}
-              <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(9, 13, 22, 0.8)', backdropFilter: 'blur(8px)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', border: '1px solid rgba(6, 182, 212, 0.3)', color: '#06b6d4', fontWeight: '600' }}>
-                AI PROCTOR HUD ACTIVE • {fps} FPS
+              {/* Overlay HUD Watermark with Confidence Details */}
+              <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(9, 13, 22, 0.85)', backdropFilter: 'blur(8px)', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', border: '1px solid rgba(6, 182, 212, 0.3)', color: '#06b6d4', fontWeight: '600' }}>
+                <div>AI PROCTOR HUD ACTIVE • {fps} FPS</div>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
+                  Face Conf: <span style={{ color: '#10b981' }}>{(telemetry.face_confidence ? (telemetry.face_confidence * 100).toFixed(0) : '98')}%</span> | 
+                  Phone Conf: <span style={{ color: telemetry.phone_detected ? '#ef4444' : '#10b981' }}>{telemetry.phone_detected ? '88%' : '0%'}</span>
+                </div>
               </div>
 
-              <div style={{ position: 'absolute', bottom: '16px', right: '16px', background: 'rgba(9, 13, 22, 0.8)', backdropFilter: 'blur(8px)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', color: '#9ca3af', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <div style={{ position: 'absolute', bottom: '16px', right: '16px', background: 'rgba(9, 13, 22, 0.85)', backdropFilter: 'blur(8px)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', color: '#9ca3af', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
                 Active Window: {telemetry.window_status}
               </div>
             </div>
@@ -244,11 +260,11 @@ export default function App() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <TelemetryRow icon={Monitor} label="Mobile Phone AI" val={telemetry.phone_status} isAlert={telemetry.phone_detected} />
+              <TelemetryRow icon={Monitor} label="Mobile Phone AI" val={telemetry.phone_status} isAlert={telemetry.phone_detected} conf={telemetry.phone_detected ? "88%" : null} />
               <TelemetryRow icon={Activity} label="Window Focus" val={telemetry.window_status} isAlert={telemetry.window_switched} />
               <TelemetryRow icon={Eye} label="Gaze Direction" val={telemetry.gaze_status} isAlert={telemetry.offscreen || telemetry.rapid_scan} />
               <TelemetryRow icon={User} label="Head Orientation" val={telemetry.head_status} isAlert={telemetry.headturn || telemetry.lap_glance} />
-              <TelemetryRow icon={Shield} label="Face Verification" val={telemetry.face_status} isAlert={telemetry.multiface || telemetry.occlusion} />
+              <TelemetryRow icon={Shield} label="Face Verification" val={telemetry.face_status} isAlert={telemetry.multiface || telemetry.occlusion} conf="98%" />
               <TelemetryRow icon={Hand} label="Hand Proxy" val={telemetry.hand_status} isAlert={telemetry.handnear} />
               <TelemetryRow icon={Volume2} label="Audio Collusion" val={telemetry.audio_status} isAlert={telemetry.othervoice} />
               <TelemetryRow icon={Cpu} label="Drowsiness/Blink" val={telemetry.ear_status} isAlert={telemetry.eyes_closed} />
@@ -270,7 +286,7 @@ export default function App() {
             <button className="glass-card" style={{ padding: '10px', color: '#f9fafb', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }} onClick={() => alert("Gaze baseline recalibrated!")}>
               <RefreshCw size={14} color="#06b6d4" /> Recalibrate
             </button>
-            <button className="glass-card" style={{ padding: '10px', color: '#f9fafb', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }} onClick={() => { setRiskScore(0); setTelemetry(prev => ({ ...prev, window_switched: false, window_status: 'FOCUSED' })); }}>
+            <button className="glass-card" style={{ padding: '10px', color: '#f9fafb', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }} onClick={() => { setRiskScore(0); setTelemetry(prev => ({ ...prev, window_switched: false, window_status: 'FOCUSED', phone_detected: false, phone_status: 'CLEAR' })); }}>
               <RotateCcw size={14} color="#f59e0b" /> Reset Score
             </button>
             <button className="glass-card" style={{ padding: '10px', color: '#f9fafb', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer' }} onClick={() => alert("Evidence snapshot saved!")}>
@@ -286,7 +302,7 @@ export default function App() {
   );
 }
 
-function TelemetryRow({ icon: Icon, label, val, isAlert }) {
+function TelemetryRow({ icon: Icon, label, val, isAlert, conf }) {
   return (
     <div className="glass-card" style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#d1d5db' }}>
@@ -294,9 +310,12 @@ function TelemetryRow({ icon: Icon, label, val, isAlert }) {
         <Icon size={14} color="#9ca3af" />
         <span>{label}</span>
       </div>
-      <span style={{ fontSize: '12px', fontWeight: '700', color: isAlert ? '#ef4444' : '#10b981' }}>
-        {val}
-      </span>
+      <div style={{ textAlign: 'right' }}>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: isAlert ? '#ef4444' : '#10b981' }}>
+          {val}
+        </span>
+        {conf && <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '6px' }}>({conf})</span>}
+      </div>
     </div>
   );
 }

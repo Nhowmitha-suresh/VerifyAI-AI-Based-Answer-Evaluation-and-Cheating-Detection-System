@@ -406,6 +406,9 @@ def main():
             draw_telemetry_panel(frame, telemetry_flags)
             draw_event_feed(frame, events)
 
+            global current_processed_frame
+            current_processed_frame = frame.copy()
+
             try:
                 cv2.imshow("Proctoring System", frame)
                 k = cv2.waitKey(1) & 0xFF

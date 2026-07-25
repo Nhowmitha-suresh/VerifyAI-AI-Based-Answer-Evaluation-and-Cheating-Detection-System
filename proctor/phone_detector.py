@@ -18,19 +18,19 @@ class ObjectDetector:
         self.net = None
         self.proto_path = MODEL_PROTO_PATH
         self.weights_path = MODEL_WEIGHTS_PATH
-        self.tracker = IoUTracker(iou_threshold=0.35, max_stale=5)
+        self.tracker = IoUTracker(iou_threshold=0.30, max_stale=5)
         self._init_model()
 
     def _init_model(self):
         if os.path.exists(self.proto_path) and os.path.exists(self.weights_path):
             try:
                 self.net = cv2.dnn.readNetFromCaffe(self.proto_path, self.weights_path)
-                logger.info("[OBJECT DETECTOR] DNN MobileNet-SSD Caffe model loaded successfully.")
+                logger.info("[OBJECT DETECTOR SUCCESS] DNN MobileNet-SSD Caffe model loaded successfully.")
             except Exception as e:
-                logger.warning(f"[OBJECT DETECTOR WARN] Could not load Caffe model: {e}. Falling back to contour detector.")
+                logger.warning(f"[OBJECT DETECTOR WARN] Could not load Caffe model: {e}. Active fallback: Adaptive Slab Contour Detector.")
                 self.net = None
         else:
-            logger.info("[OBJECT DETECTOR INFO] Caffe weights file not found. Using geometric contour detector.")
+            logger.warning(f"[OBJECT DETECTOR WARN] Caffe weights '{self.weights_path}' missing. Active fallback: Adaptive Slab Contour Detector.")
 
     def detect_objects(self, frame: np.ndarray) -> List[Dict[str, Any]]:
         """
@@ -83,7 +83,7 @@ class ObjectDetector:
                         "confidence": raw_confidences[idx]
                     })
 
-        # 3. Geometric Phone Slab Contour Fallback if DNN produces no candidates
+        # 3. Geometric & Dark Rectangular Phone Slab Contour Fallback
         if not nms_detections:
             try:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -93,17 +93,20 @@ class ObjectDetector:
                 
                 for c in contours:
                     area = cv2.contourArea(c)
-                    if 2500 < area < 45000:
+                    if 1200 < area < 65000:
                         x, y, cw, ch = cv2.boundingRect(c)
                         aspect_ratio = float(ch) / max(1, cw)
-                        if (1.5 <= aspect_ratio <= 2.4 or 0.42 <= aspect_ratio <= 0.65) and (y > h * 0.20):
+                        # Flexible phone aspect ratio (vertical: 1.2 to 2.8, horizontal/tilted: 0.35 to 0.85)
+                        if (1.2 <= aspect_ratio <= 2.8 or 0.35 <= aspect_ratio <= 0.85):
                             rect_area = cw * ch
                             extent = float(area) / rect_area
-                            if extent > 0.70:
+                            if extent > 0.65:
+                                # Calculate confidence score based on aspect ratio match and extent solidity
+                                conf = min(0.92, 0.70 + (extent - 0.65) * 0.5)
                                 nms_detections.append({
                                     "box": (x, y, cw, ch),
                                     "label": "cell phone",
-                                    "confidence": 0.75
+                                    "confidence": float(conf)
                                 })
                                 break
             except Exception as e:
