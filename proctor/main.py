@@ -1,5 +1,6 @@
 """
 Main Proctoring Application Engine & Thread Orchestrator.
+Integrates Multi-Modal Telemetry, Explainable AI Behavioral Engine, Circular Video Buffer & Gaze Heatmaps.
 """
 
 import sys
@@ -31,6 +32,11 @@ from .phone_detector import ObjectDetector
 from .audio import AudioMonitor, start_alert, stop_alerts
 from .logger import events, logger, push_event, log_event, current_score, save_snapshot
 from .hud import draw_hud_header, draw_risk_gauge, draw_telemetry_panel, draw_event_feed
+from .behavior_engine import BehavioralRiskEngine
+from .timeline import IncidentRecorder
+from .heatmap import GazeHeatmapTracker
+from .identity import IdentityVerifier
+from .analytics import SessionAnalytics
 from .report import generate_html_report
 
 
@@ -49,9 +55,11 @@ def get_active_window_title():
 
 
 def main():
+    print("[PASS] STEP 1 - Starting AI Proctoring Application Engine...", flush=True)
     logger.info("[STARTUP] [1/10] Starting AI Proctoring Application Engine...")
     
     try:
+        print("[PASS] STEP 2 - Initializing MediaPipe FaceMesh & Hands Solutions...", flush=True)
         logger.info("[STARTUP] [2/10] Initializing MediaPipe FaceMesh & Hands Solutions...")
         with SilenceFD():
             face_mesh = mp.solutions.face_mesh.FaceMesh(
@@ -71,19 +79,27 @@ def main():
             if hands:
                 hands.process(dummy_rgb)
 
+        print("[PASS] STEP 2 - MediaPipe Solutions Initialized & Warmed Up", flush=True)
         logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized & warmed up cleanly.")
 
+        print("[PASS] STEP 3 - Initializing CameraManager...", flush=True)
         logger.info("[STARTUP] [3/10] Initializing CameraManager...")
         camera = CameraManager(width=CAM_W, height=CAM_H)
         camera.start()
+        print("[PASS] STEP 3 - CameraManager Started Successfully", flush=True)
         logger.info("[STARTUP] [3/10] CameraManager started successfully.")
 
-        logger.info("[STARTUP] [4/10] Initializing GazeTracker...")
+        print("[PASS] STEP 4 - Initializing GazeTracker & Heatmap Engine...", flush=True)
+        logger.info("[STARTUP] [4/10] Initializing GazeTracker & Heatmap Engine...")
         gaze_tracker = GazeTracker()
+        heatmap_tracker = GazeHeatmapTracker()
 
-        logger.info("[STARTUP] [5/10] Initializing HeadPoseEstimator...")
+        print("[PASS] STEP 5 - Initializing HeadPoseEstimator & Identity Verifier...", flush=True)
+        logger.info("[STARTUP] [5/10] Initializing HeadPoseEstimator & Identity Verifier...")
         head_pose_estimator = HeadPoseEstimator()
+        identity_verifier = IdentityVerifier()
 
+        print("[PASS] STEP 6 - Initializing ObjectDetector...", flush=True)
         logger.info("[STARTUP] [6/10] Initializing ObjectDetector...")
         object_detector = None
         if ENABLE_OBJECT_DETECTION:
@@ -92,6 +108,7 @@ def main():
             except Exception as e:
                 logger.warning(f"ObjectDetector initialization failed: {e}. Subsystem disabled.")
 
+        print("[PASS] STEP 7 - Initializing AudioMonitor...", flush=True)
         logger.info("[STARTUP] [7/10] Initializing AudioMonitor...")
         audio_mon = None
         if ENABLE_AUDIO:
@@ -101,10 +118,17 @@ def main():
             except Exception as e:
                 logger.warning(f"AudioMonitor initialization failed: {e}. Subsystem disabled.")
 
+        print("[PASS] STEP 8 - Initializing Behavioral AI & Incident Buffer...", flush=True)
+        logger.info("[STARTUP] [8/10] Initializing Behavioral AI & Incident Buffer...")
+        behavior_engine = BehavioralRiskEngine()
+        incident_recorder = IncidentRecorder()
+        session_analytics = SessionAnalytics()
+
         initial_window = get_active_window_title()
 
         # Calibration Phase
-        logger.info("[STARTUP] [8/10] Calibration starting...")
+        print("[PASS] STEP 9 - Calibration Starting...", flush=True)
+        logger.info("[STARTUP] [9/10] Calibration starting...")
         calib_samples = []
         calib_start = time.time()
         while time.time() - calib_start < 2.5:
@@ -120,6 +144,7 @@ def main():
                 try:
                     g_res = gaze_tracker.process(lm, time.time())
                     calib_samples.append((g_res["dx"], g_res["dy"]))
+                    identity_verifier.register_baseline(lm)
                 except Exception as e:
                     logger.debug(f"Calibration gaze processing exception: {e}")
             cv2.putText(frame, "CALIBRATING GAZE BASELINE... LOOK AT CENTER", (w // 2 - 260, h // 2),
@@ -134,7 +159,8 @@ def main():
         if calib_samples:
             calib_center = np.mean(calib_samples, axis=0)
             gaze_tracker.calibrate((0.5 + calib_center[0], 0.5 + calib_center[1]))
-        logger.info("[STARTUP] [9/10] Baseline calibration completed.")
+        print("[PASS] STEP 9 - Calibration & Identity Registration Completed", flush=True)
+        logger.info("[STARTUP] [9/10] Baseline calibration & identity registration completed.")
 
         frame_idx = 0
         start_time = time.time()
@@ -154,7 +180,9 @@ def main():
 
         last_high_snapshot = 0
         last_phone_snapshot = 0
+        last_incident_trigger = 0
 
+        print("[PASS] STEP 10 - Entering Main Detection Loop (OpenCV Window Active)", flush=True)
         logger.info("[STARTUP] [10/10] Entering main detection loop...")
 
         while True:
@@ -166,6 +194,9 @@ def main():
             h, w = frame.shape[:2]
             frame_idx += 1
             now = time.time()
+
+            # Push frame into circular video recorder
+            incident_recorder.push_frame(frame, now)
 
             dt = now - last_frame_time
             last_frame_time = now
@@ -205,9 +236,6 @@ def main():
                         cv2.putText(frame, f"MOBILE PHONE {int(conf*100)}%", (bx, max(20, by - 8)),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
                         
-                        push_event(WEIGHT_PHONE_DETECTED, "phone_detected")
-                        log_event("phone_detected", WEIGHT_PHONE_DETECTED)
-                        
                         if now - last_phone_snapshot > 3.0:
                             save_snapshot(frame, reason="mobile_phone")
                             last_phone_snapshot = now
@@ -217,8 +245,6 @@ def main():
             if curr_window and curr_window != initial_window and "Proctoring System" not in curr_window:
                 window_switch_flag = True
                 window_str = "UNFOCUSED"
-                push_event(WEIGHT_WINDOW_SWITCH, "window_switch")
-                log_event("window_switch", WEIGHT_WINDOW_SWITCH)
 
             # 3. FACEMESH & TELEMETRY
             if results and results.multi_face_landmarks:
@@ -233,11 +259,18 @@ def main():
 
                 lm = np.array([(int(p.x * w), int(p.y * h)) for p in results.multi_face_landmarks[0].landmark])
 
-                # Gaze Analytics
+                # Identity Verification Check
+                id_res = identity_verifier.verify(lm)
+                if not id_res["verified"]:
+                    face_str = "UNVERIFIED PERSON"
+
+                # Gaze Analytics & Heatmap
                 g_res = gaze_tracker.process(lm, now)
                 gaze_str = g_res["gaze_direction"]
                 offscreen_flag = g_res["offscreen"]
                 rapid_scan_flag = g_res["rapid_scan"]
+
+                heatmap_tracker.push_gaze_point(0.5 + g_res["dx"], 0.5 + g_res["dy"])
 
                 if g_res["Lc"] != (0, 0):
                     cv2.circle(frame, g_res["Lc"], 3, (0, 255, 255), -1)
@@ -270,7 +303,7 @@ def main():
                     occlusion_flag = True
 
             # Hands Near Face
-            if ENABLE_HANDS and hands_res and results and results.multi_face_landmarks:
+            if ENABLE_HANDS and hands_res and hands_res.multi_hand_landmarks and results and results.multi_face_landmarks:
                 lm = np.array([(int(p.x * w), int(p.y * h)) for p in results.multi_face_landmarks[0].landmark])
                 fx0, fy0 = lm[:, 0].min(), lm[:, 1].min()
                 fx1, fy1 = lm[:, 0].max(), lm[:, 1].max()
@@ -304,33 +337,31 @@ def main():
                 if audio_act:
                     audio_str = "VOICE SPEECH" if mouth_open >= MOUTH_OPEN_THRESHOLD else "SUSPICIOUS VOICE"
                     if mouth_open < MOUTH_OPEN_THRESHOLD:
-                        push_event(WEIGHT_OTHERVOICE, "other_voice")
-                        log_event("other_voice", WEIGHT_OTHERVOICE)
                         othervoice_flag = True
                 else:
                     audio_str = "QUIET"
 
-            # Log Violations
-            if offscreen_flag:
-                push_event(WEIGHT_OFFSCREEN, "offscreen"); log_event("offscreen", WEIGHT_OFFSCREEN)
-            if headturn_flag:
-                push_event(WEIGHT_HEADTURN, "headturn"); log_event("headturn", WEIGHT_HEADTURN)
-            if fullturn_flag:
-                push_event(WEIGHT_FULLTURN, "fullturn"); log_event("fullturn", WEIGHT_FULLTURN)
-            if handnear_flag:
-                push_event(WEIGHT_HAND_NEAR, "hand_near"); log_event("hand_near", WEIGHT_HAND_NEAR)
-            if multiface_flag:
-                push_event(WEIGHT_MULTIFACE, "multiface"); log_event("multiface", WEIGHT_MULTIFACE)
-            if occlusion_flag:
-                push_event(WEIGHT_OCCLUSION, "occlusion"); log_event("occlusion", WEIGHT_OCCLUSION)
-            if eyes_closed_flag:
-                push_event(WEIGHT_EYES_CLOSED, "eyes_closed"); log_event("eyes_closed", WEIGHT_EYES_CLOSED)
+            telemetry_flags = {
+                "phone_status": phone_str, "phone_detected": phone_flag,
+                "window_status": window_str, "window_switched": window_switch_flag,
+                "gaze_status": gaze_str, "offscreen": offscreen_flag, "rapid_scan": rapid_scan_flag,
+                "head_status": head_str, "headturn": headturn_flag or fullturn_flag, "lap_glance": lap_glance_flag,
+                "face_status": face_str, "multiface": multiface_flag, "occlusion": occlusion_flag,
+                "hand_status": hand_str, "handnear": handnear_flag,
+                "audio_status": audio_str, "othervoice": othervoice_flag,
+                "ear_status": ear_str, "eyes_closed": eyes_closed_flag
+            }
 
-            score = current_score()
+            # 4. Behavioral Risk AI Engine Evaluation
+            risk_eval = behavior_engine.evaluate_telemetry(telemetry_flags, now)
+            score = risk_eval["risk_score"]
+            explanation = risk_eval["explanation"]
 
-            if score >= ALARM_HIGH and (now - last_high_snapshot > 5.0):
+            # Trigger Incident Video Recording on High Risk
+            if score >= ALARM_HIGH and (now - last_incident_trigger > 12.0):
+                incident_recorder.trigger_incident("High Risk Violation", score, explanation)
                 save_snapshot(frame, reason="high_risk")
-                last_high_snapshot = now
+                last_incident_trigger = now
 
             if score >= ALARM_HIGH or phone_flag:
                 start_alert("high")
@@ -346,16 +377,6 @@ def main():
             draw_hud_header(frame, fps, elapsed, score, status_text, curr_window)
             draw_risk_gauge(frame, score)
             
-            telemetry_flags = {
-                "phone_status": phone_str, "phone_detected": phone_flag,
-                "window_status": window_str, "window_switched": window_switch_flag,
-                "gaze_status": gaze_str, "offscreen": offscreen_flag, "rapid_scan": rapid_scan_flag,
-                "head_status": head_str, "headturn": headturn_flag or fullturn_flag, "lap_glance": lap_glance_flag,
-                "face_status": face_str, "multiface": multiface_flag, "occlusion": occlusion_flag,
-                "hand_status": hand_str, "handnear": handnear_flag,
-                "audio_status": audio_str, "othervoice": othervoice_flag,
-                "ear_status": ear_str, "eyes_closed": eyes_closed_flag
-            }
             draw_telemetry_panel(frame, telemetry_flags)
             draw_event_feed(frame, events)
 
@@ -370,6 +391,7 @@ def main():
                     logger.info("Recalibrated gaze baseline.")
                 elif k == ord('r') or k == ord('R'):
                     events.clear()
+                    behavior_engine.cumulative_score = 0.0
                     logger.info("Reset risk score.")
                 elif k == ord('s') or k == ord('S'):
                     save_snapshot(frame, reason="manual")
@@ -394,8 +416,18 @@ def main():
         if 'hands' in locals() and hands:
             hands.close()
         
-        generate_html_report()
+        # Export Gaze Heatmap & HTML Session Audit Report
+        try:
+            heatmap_tracker.generate_heatmap_overlay(np.zeros((720, 1280, 3), dtype=np.uint8))
+            gaze_analytics = heatmap_tracker.compute_analytics()
+            incidents = incident_recorder.get_incidents()
+            analytics_summary = session_analytics.get_summary(gaze_analytics, incidents)
+            generate_html_report(incident_logs=incidents, analytics_summary=analytics_summary)
+        except Exception as e:
+            logger.error(f"Error during report export: {e}")
+
         logger.info("Proctoring session exited cleanly.")
+
 
 if __name__ == "__main__":
     main()

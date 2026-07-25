@@ -1,5 +1,5 @@
 """
-Automated Unit Test Suite for AI Proctoring Suite.
+Automated Comprehensive Unit Test Suite for AI Proctoring Suite.
 """
 
 import os
@@ -14,6 +14,11 @@ from proctor.gaze import GazeTracker
 from proctor.headpose import HeadPoseEstimator
 from proctor.phone_detector import ObjectDetector
 from proctor.logger import push_event, current_score, log_event, save_snapshot
+from proctor.behavior_engine import BehavioralRiskEngine
+from proctor.timeline import IncidentRecorder
+from proctor.heatmap import GazeHeatmapTracker
+from proctor.identity import IdentityVerifier
+from proctor.analytics import SessionAnalytics
 from proctor.report import generate_html_report
 
 class TestProctorSuite(unittest.TestCase):
@@ -71,9 +76,47 @@ class TestProctorSuite(unittest.TestCase):
         self.assertIsNotNone(filepath)
         self.assertTrue(os.path.exists(filepath))
 
-    def test_08_html_report_generation(self):
-        """Test generating interactive HTML audit report."""
-        generate_html_report()
+    def test_08_behavioral_risk_engine(self):
+        """Test Explainable AI Behavioral Risk Engine multi-signal combos."""
+        engine = BehavioralRiskEngine()
+        telemetry = {"phone_detected": True, "lap_glance": True}
+        res = engine.evaluate_telemetry(telemetry, now=100.0)
+        self.assertGreaterEqual(res["risk_score"], 40.0)
+        self.assertEqual(res["severity"], "CRITICAL")
+        self.assertIn("explanation", res)
+
+    def test_09_incident_recorder(self):
+        """Test Circular Incident Video Buffer."""
+        recorder = IncidentRecorder(pre_roll_sec=1.0, post_roll_sec=1.0, fps=10.0)
+        dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        recorder.push_frame(dummy_frame)
+        path = recorder.trigger_incident("unit_test", 30.0, "Test incident trigger")
+        self.assertIsNotNone(path)
+
+    def test_10_gaze_heatmap(self):
+        """Test Gaze Heatmap density tracking."""
+        tracker = GazeHeatmapTracker()
+        tracker.push_gaze_point(0.5, 0.5)
+        tracker.push_gaze_point(0.2, 0.8)
+        analytics = tracker.compute_analytics()
+        self.assertEqual(analytics["total_gaze_samples"], 2)
+        dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        blended = tracker.generate_heatmap_overlay(dummy_frame)
+        self.assertIsNotNone(blended)
+
+    def test_11_identity_verifier(self):
+        """Test Candidate Identity Verification."""
+        verifier = IdentityVerifier()
+        dummy_lm = np.ones((478, 2), dtype=int) * 50
+        res = verifier.verify(dummy_lm)
+        self.assertIn("verified", res)
+
+    def test_12_session_analytics_and_report(self):
+        """Test Session Analytics and Enhanced HTML Report Generation."""
+        analytics = SessionAnalytics()
+        summary = analytics.get_summary()
+        self.assertIn("verdict", summary)
+        generate_html_report(analytics_summary=summary)
         self.assertTrue(os.path.exists(REPORT_FILE))
 
 if __name__ == "__main__":

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NegoSphere AI Proctoring - Live Oversight Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090d16;
+            --panel: #111827;
+            --card: #1f2937;
+            --border: #374151;
+            --cyan: #06b6d4;
+            --blue: #3b82f6;
+            --green: #10b981;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --text: #f9fafb;
+            --text-dim: #9ca3af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
+
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px 24px; margin-bottom: 20px;
+        }
+
+        .title-box h1 { font-size: 20px; font-weight: 800; color: var(--cyan); letter-spacing: -0.5px; }
+        .title-box p { font-size: 13px; color: var(--text-dim); }
+
+        .status-badge {
+            padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700;
+            background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid var(--green);
+        }
+
+        .dashboard-grid {
+            display: grid; grid-template-columns: 2fr 1fr; gap: 20px;
+        }
+
+        .video-container {
+            background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px; position: relative; display: flex; flex-direction: column; align-items: center;
+        }
+
+        .video-feed {
+            width: 100%; height: auto; max-height: 540px; border-radius: 8px;
+            border: 2px solid var(--border); background: #000; object-fit: contain;
+        }
+
+        .risk-bar-container {
+            width: 100%; margin-top: 16px; background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 20px;
+        }
+
+        .risk-bar-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+        .risk-track { height: 12px; background: #111827; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+        .risk-fill { height: 100%; width: 0%; background: var(--green); transition: width 0.3s, background 0.3s; }
+
+        .telemetry-panel {
+            background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px; display: flex; flex-direction: column; gap: 16px;
+        }
+
+        .panel-title { font-size: 14px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+
+        .telemetry-list { display: flex; flex-direction: column; gap: 12px; }
+        .telemetry-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--card); padding: 10px 14px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border);
+        }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 8px; }
+        .dot.alert { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+        .explainability-box {
+            background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 20px;
+        }
+
+        .explainability-box h3 { font-size: 13px; color: var(--cyan); text-transform: uppercase; margin-bottom: 8px; }
+        .explanation-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="title-box">
+            <h1>NegoSphere AI Proctoring Engine</h1>
+            <p>Real-Time Commercial Exam Monitoring & Remote Oversight Dashboard</p>
+        </div>
+        <div class="status-badge" id="systemStatus">MONITORING - NORMAL</div>
+    </header>
+
+    <div class="dashboard-grid">
+        <div class="video-container">
+            <img src="http://localhost:8000/api/video_feed" alt="Live Stream Feed" class="video-feed" id="videoFeed" onerror="this.src='snapshots/gaze_heatmap_latest.jpg';">
+            
+            <div class="risk-bar-container">
+                <div class="risk-bar-header">
+                    <span>CANDIDATE RISK INDEX</span>
+                    <span id="riskScoreVal">0.0 / 28</span>
+                </div>
+                <div class="risk-track">
+                    <div class="risk-fill" id="riskFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="telemetry-panel">
+            <div class="panel-title">Telemetry Monitor</div>
+            <div class="telemetry-list">
+                <div class="telemetry-item">
+                    <span><span class="dot" id="dotPhone"></span>Mobile Phone AI</span>
+                    <strong id="valPhone">CLEAR</strong>
+                </div>
+                <div class="telemetry-item">
+                    <span><span class="dot" id="dotWindow"></span>Window Focus</span>
+                    <strong id="valWindow">FOCUSED</strong>
+                </div>
+                <div class="telemetry-item">
+                    <span><span class="dot" id="dotGaze"></span>Eye Gaze</span>
+                    <strong id="valGaze">CENTER</strong>
+                </div>
+                <div class="telemetry-item">
+                    <span><span class="dot" id="dotHead"></span>Head Pose</span>
+                    <strong id="valHead">NORMAL</strong>
+                </div>
+                <div class="telemetry-item">
+                    <span><span class="dot" id="dotFace"></span>Face Verification</span>
+                    <strong id="valFace">VERIFIED</strong>
+                </div>
+                <div class="telemetry-item">
+                    <span><span class="dot" id="dotAudio"></span>Voice & Collusion</span>
+                    <strong id="valAudio">QUIET</strong>
+                </div>
+            </div>
+
+            <div class="explainability-box">
+                <h3>Explainable AI Rationale</h3>
+                <p class="explanation-text" id="explanationText">Candidate behavior normal and centered within frame boundaries.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
