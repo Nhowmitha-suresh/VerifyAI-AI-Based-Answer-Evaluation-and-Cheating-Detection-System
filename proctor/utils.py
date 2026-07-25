@@ -51,6 +51,15 @@ class SilenceFD:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._enabled:
             try:
+                try:
+                    if self._win32:
+                        ctypes.cdll.msvcrt.fflush(0)
+                except Exception:
+                    pass
+
+                sys.stdout.flush()
+                sys.stderr.flush()
+
                 if self._win32:
                     try:
                         kernel32 = ctypes.windll.kernel32
