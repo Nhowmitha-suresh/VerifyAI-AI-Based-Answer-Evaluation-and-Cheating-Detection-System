@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  proctoring-platform:
+    build: .
+    container_name: verifyai_proctoring_platform
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=True
+    volumes:
+      - ./snapshots:/app/snapshots
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+    devices:
+      - "/dev/video0:/dev/video0" # Pass through primary webcam on Linux hosts
+    restart: unless-stopped
