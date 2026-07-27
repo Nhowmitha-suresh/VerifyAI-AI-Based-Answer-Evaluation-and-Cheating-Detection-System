@@ -17,17 +17,7 @@ class SilenceFD:
     to NUL device during MediaPipe solution loading.
     """
     def __enter__(self):
-        try:
-            sys.stdout.flush()
-            sys.stderr.flush()
-            self._null_fd = os.open(os.devnull, os.O_RDWR)
-            self._stdout_save = os.dup(1)
-            self._stderr_save = os.dup(2)
-            os.dup2(self._null_fd, 1)
-            os.dup2(self._null_fd, 2)
-            self._active = True
-        except Exception:
-            self._active = False
+        self._active = False
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

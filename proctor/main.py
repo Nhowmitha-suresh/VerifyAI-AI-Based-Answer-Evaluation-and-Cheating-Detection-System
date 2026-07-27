@@ -12,10 +12,7 @@ import collections
 import numpy as np
 
 from .utils import SilenceFD, calculate_ear
-
-# Silence MediaPipe C++ graph dumps during import and solution creation
-with SilenceFD():
-    import mediapipe as mp
+import mediapipe as mp
 
 from .config import (
     CAM_W, CAM_H, PROCESS_EVERY_N, ENABLE_HANDS, ENABLE_OBJECT_DETECTION, ENABLE_AUDIO,
@@ -80,23 +77,23 @@ def main():
     try:
         print("[PASS] STEP 2 - Initializing MediaPipe FaceMesh & Hands Solutions...", flush=True)
         logger.info("[STARTUP] [2/10] Initializing MediaPipe FaceMesh & Hands Solutions...")
-        with SilenceFD():
-            face_mesh = mp.solutions.face_mesh.FaceMesh(
-                max_num_faces=2,
-                refine_landmarks=True,
-                min_detection_confidence=0.5,
-                min_tracking_confidence=0.5
-            )
-            hands = mp.solutions.hands.Hands(
-                max_num_hands=2,
-                min_detection_confidence=0.5
-            ) if ENABLE_HANDS else None
+        face_mesh = mp.solutions.face_mesh.FaceMesh(
+            max_num_faces=2,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
 
-            # Warmup first frame inside SilenceFD to capture lazy C++ graph compilation dumps!
-            dummy_rgb = np.zeros((480, 640, 3), dtype=np.uint8)
-            face_mesh.process(dummy_rgb)
-            if hands:
-                hands.process(dummy_rgb)
+        hands = mp.solutions.hands.Hands(
+            max_num_hands=2,
+            min_detection_confidence=0.5
+        ) if ENABLE_HANDS else None
+
+        # Warmup first frame
+        dummy_rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+        face_mesh.process(dummy_rgb)
+        if hands:
+            hands.process(dummy_rgb)
 
         print("[PASS] STEP 2 - MediaPipe Solutions Initialized & Warmed Up", flush=True)
         logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized & warmed up cleanly.")

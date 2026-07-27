@@ -57,6 +57,14 @@ if HAS_FASTAPI:
         "explanation": "Candidate behavior normal and centered."
     }
 
+    @app.get("/", response_class=HTMLResponse)
+    def root_dashboard():
+        dash_path = os.path.join(os.path.dirname(__file__), "..", "proctor", "dashboard.html")
+        if os.path.exists(dash_path):
+            with open(dash_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return "<h1>VerifyAI Proctoring Backend Engine Online</h1><p>Visit <a href='/docs'>/docs</a> or <a href='/api/report'>/api/report</a></p>"
+
     @app.get("/api/health")
     def health_check():
         return {"status": "ONLINE", "system": "VerifyAI Proctoring Engine", "timestamp": time.time()}
@@ -66,6 +74,14 @@ if HAS_FASTAPI:
         latest_telemetry_state.update(payload)
         streamer.broadcast_sync(latest_telemetry_state)
         return {"status": "OK"}
+
+    @app.get("/api/telemetry/update")
+    def get_telemetry_update_notice():
+        return {
+            "notice": "This endpoint accepts POST requests from the proctoring engine.",
+            "live_telemetry_data": latest_telemetry_state,
+            "view_live_url": "/api/telemetry/live"
+        }
 
     @app.get("/api/telemetry/live")
     def get_live_telemetry():
