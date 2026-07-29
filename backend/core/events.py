@@ -1,0 +1,26 @@
+"""
+Event System & Constants for AI Proctoring System.
+"""
+
+from enum import Enum
+
+class IncidentType(str, Enum):
+    MOBILE_PHONE = "MOBILE_PHONE"
+    WINDOW_SWITCH = "WINDOW_SWITCH"
+    OFFSCREEN_GAZE = "OFFSCREEN_GAZE"
+    RAPID_GAZE_SCAN = "RAPID_GAZE_SCAN"
+    HEAD_TURN = "HEAD_TURN"
+    FULL_HEAD_TURN = "FULL_HEAD_TURN"
+    LAP_GLANCE = "LAP_GLANCE"
+    MULTIFACE = "MULTIFACE"
+    FACE_OCCLUSION = "FACE_OCCLUSION"
+    HAND_NEAR_FACE = "HAND_NEAR_FACE"
+    OTHER_VOICE = "OTHER_VOICE"
+    EYES_CLOSED = "EYES_CLOSED"
+    HIGH_RISK_VIOLATION = "HIGH_RISK_VIOLATION"
+
+class SeverityLevel(str, Enum):
+    NORMAL = "NORMAL"
+    WARNING = "WARNING"
+    HIGH_RISK = "HIGH_RISK"
+    CRITICAL = "CRITICAL"

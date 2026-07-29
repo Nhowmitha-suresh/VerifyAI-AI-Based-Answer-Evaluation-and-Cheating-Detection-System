@@ -28,7 +28,7 @@ from proctor.streaming import streamer
 
 if HAS_FASTAPI:
     app = FastAPI(
-        title="NegoSphere AI Proctoring Platform API",
+        title="VerifyAI Proctoring Platform API",
         description="REST & WebSockets Backend for Remote Candidate Exam Monitoring",
         version="2.0.0"
     )
@@ -44,9 +44,66 @@ if HAS_FASTAPI:
     if os.path.exists(SNAPSHOT_DIR):
         app.mount("/snapshots", StaticFiles(directory=SNAPSHOT_DIR), name="snapshots")
 
+    latest_telemetry_state = {
+        "phone_status": "CLEAR", "phone_detected": False,
+        "window_status": "FOCUSED", "window_switched": False,
+        "gaze_status": "CENTER", "offscreen": False, "rapid_scan": False,
+        "head_status": "NORMAL", "headturn": False, "lap_glance": False,
+        "face_status": "VERIFIED", "multiface": False, "occlusion": False,
+        "hand_status": "CLEAR", "handnear": False,
+        "audio_status": "QUIET", "othervoice": False,
+        "ear_status": "ACTIVE", "eyes_closed": False,
+        "risk_score": 0.0, "severity": "NORMAL",
+        "explanation": "Candidate behavior normal and centered."
+    }
+
+    @app.get("/", response_class=HTMLResponse)
+    def root_dashboard():
+        dash_path = os.path.join(os.path.dirname(__file__), "..", "proctor", "dashboard.html")
+        if os.path.exists(dash_path):
+            with open(dash_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return "<h1>VerifyAI Proctoring Backend Engine Online</h1><p>Visit <a href='/docs'>/docs</a> or <a href='/api/report'>/api/report</a></p>"
+
     @app.get("/api/health")
     def health_check():
-        return {"status": "ONLINE", "system": "NegoSphere AI Proctoring Engine", "timestamp": time.time()}
+        return {"status": "ONLINE", "system": "VerifyAI Proctoring Engine", "timestamp": time.time()}
+
+    @app.post("/api/telemetry/update")
+    def update_telemetry(payload: Dict[str, Any]):
+        latest_telemetry_state.update(payload)
+        streamer.broadcast_sync(latest_telemetry_state)
+        return {"status": "OK"}
+
+    @app.get("/api/telemetry/update")
+    def get_telemetry_update_notice():
+        return {
+            "notice": "This endpoint accepts POST requests from the proctoring engine.",
+            "live_telemetry_data": latest_telemetry_state,
+            "view_live_url": "/api/telemetry/live"
+        }
+
+    @app.get("/api/telemetry/live")
+    def get_live_telemetry():
+        return latest_telemetry_state
+
+    @app.get("/api/video_feed")
+    def video_feed():
+        from fastapi.responses import StreamingResponse
+        import cv2
+        from proctor import main as proctor_main
+
+        def generate_frames():
+            while True:
+                frame = getattr(proctor_main, "current_processed_frame", None)
+                if frame is not None:
+                    ret, jpeg = cv2.imencode('.jpg', frame)
+                    if ret:
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                time.sleep(0.033)
+
+        return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
     @app.get("/api/session/status")
     def get_session_status():
@@ -54,7 +111,8 @@ if HAS_FASTAPI:
             "active": True,
             "total_events": len(all_logged_events),
             "peak_score": max([e["total"] for e in all_logged_events], default=0.0),
-            "latest_event": all_logged_events[-1] if all_logged_events else None
+            "latest_event": all_logged_events[-1] if all_logged_events else None,
+            "telemetry": latest_telemetry_state
         }
 
     @app.get("/api/events")

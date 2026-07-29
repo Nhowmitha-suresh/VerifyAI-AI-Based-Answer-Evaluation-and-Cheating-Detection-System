@@ -12,10 +12,7 @@ import collections
 import numpy as np
 
 from .utils import SilenceFD, calculate_ear
-
-# Silence MediaPipe C++ graph dumps during import and solution creation
-with SilenceFD():
-    import mediapipe as mp
+import mediapipe as mp
 
 from .config import (
     CAM_W, CAM_H, PROCESS_EVERY_N, ENABLE_HANDS, ENABLE_OBJECT_DETECTION, ENABLE_AUDIO,
@@ -40,6 +37,30 @@ from .analytics import SessionAnalytics
 from .report import generate_html_report
 
 
+import urllib.request
+import json
+import base64
+import threading
+
+def sync_telemetry_to_backend(payload, frame=None):
+    def _post():
+        try:
+            if frame is not None and frame.size > 0:
+                ret, buf = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 65])
+                if ret:
+                    payload["frame_b64"] = base64.b64encode(buf.tobytes()).decode('ascii')
+            req = urllib.request.Request(
+                "http://localhost:8000/api/telemetry/update",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            urllib.request.urlopen(req, timeout=0.5)
+        except Exception:
+            pass
+    threading.Thread(target=_post, daemon=True).start()
+
+
 def get_active_window_title():
     if sys.platform == "win32":
         try:
@@ -61,23 +82,23 @@ def main():
     try:
         print("[PASS] STEP 2 - Initializing MediaPipe FaceMesh & Hands Solutions...", flush=True)
         logger.info("[STARTUP] [2/10] Initializing MediaPipe FaceMesh & Hands Solutions...")
-        with SilenceFD():
-            face_mesh = mp.solutions.face_mesh.FaceMesh(
-                max_num_faces=2,
-                refine_landmarks=True,
-                min_detection_confidence=0.5,
-                min_tracking_confidence=0.5
-            )
-            hands = mp.solutions.hands.Hands(
-                max_num_hands=2,
-                min_detection_confidence=0.5
-            ) if ENABLE_HANDS else None
+        face_mesh = mp.solutions.face_mesh.FaceMesh(
+            max_num_faces=2,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
 
-            # Warmup first frame inside SilenceFD to capture lazy C++ graph compilation dumps!
-            dummy_rgb = np.zeros((480, 640, 3), dtype=np.uint8)
-            face_mesh.process(dummy_rgb)
-            if hands:
-                hands.process(dummy_rgb)
+        hands = mp.solutions.hands.Hands(
+            max_num_hands=2,
+            min_detection_confidence=0.5
+        ) if ENABLE_HANDS else None
+
+        # Warmup first frame
+        dummy_rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+        face_mesh.process(dummy_rgb)
+        if hands:
+            hands.process(dummy_rgb)
 
         print("[PASS] STEP 2 - MediaPipe Solutions Initialized & Warmed Up", flush=True)
         logger.info("[STARTUP] [2/10] MediaPipe Solutions initialized & warmed up cleanly.")
@@ -184,6 +205,7 @@ def main():
 
         print("[PASS] STEP 10 - Entering Main Detection Loop (OpenCV Window Active)", flush=True)
         logger.info("[STARTUP] [10/10] Entering main detection loop...")
+        last_detections = []
 
         while True:
             ret, frame = camera.read()
@@ -206,14 +228,14 @@ def main():
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = None
             hands_res = None
-            detections = []
-
             if (frame_idx % PROCESS_EVERY_N) == 0:
                 results = face_mesh.process(rgb)
                 if ENABLE_HANDS and hands:
                     hands_res = hands.process(rgb)
                 if object_detector:
-                    detections = object_detector.detect_objects(frame)
+                    last_detections = object_detector.detect_objects(frame)
+
+            detections = last_detections
 
             offscreen_flag = headturn_flag = fullturn_flag = handnear_flag = False
             multiface_flag = occlusion_flag = othervoice_flag = eyes_closed_flag = False
@@ -221,6 +243,7 @@ def main():
 
             gaze_str, head_str, face_str, hand_str, audio_str, ear_str = "CENTER", "NORMAL", "1 Face", "CLEAR", "QUIET", "ACTIVE"
             phone_str, window_str = "CLEAR", "FOCUSED"
+            phone_conf = 0.0
 
             # 1. MOBILE PHONE & FORBIDDEN OBJECT DETECTION
             if detections:
@@ -231,6 +254,7 @@ def main():
                     
                     if label in ["cell phone", "mobile phone"]:
                         phone_flag = True
+                        phone_conf = max(phone_conf, conf)
                         phone_str = f"PHONE ({int(conf*100)}%)"
                         cv2.rectangle(frame, (bx, by), (bx + bw, by + bh), (0, 0, 255), 3)
                         cv2.putText(frame, f"MOBILE PHONE {int(conf*100)}%", (bx, max(20, by - 8)),
@@ -342,7 +366,7 @@ def main():
                     audio_str = "QUIET"
 
             telemetry_flags = {
-                "phone_status": phone_str, "phone_detected": phone_flag,
+                "phone_status": phone_str, "phone_detected": phone_flag, "phone_confidence": float(phone_conf),
                 "window_status": window_str, "window_switched": window_switch_flag,
                 "gaze_status": gaze_str, "offscreen": offscreen_flag, "rapid_scan": rapid_scan_flag,
                 "head_status": head_str, "headturn": headturn_flag or fullturn_flag, "lap_glance": lap_glance_flag,
@@ -357,15 +381,28 @@ def main():
             score = risk_eval["risk_score"]
             explanation = risk_eval["explanation"]
 
+            sync_telemetry_to_backend({
+                **telemetry_flags,
+                "risk_score": score,
+                "severity": risk_eval["severity"],
+                "explanation": explanation
+            }, frame=frame)
+
             # Trigger Incident Video Recording on High Risk
             if score >= ALARM_HIGH and (now - last_incident_trigger > 12.0):
                 incident_recorder.trigger_incident("High Risk Violation", score, explanation)
                 save_snapshot(frame, reason="high_risk")
                 last_incident_trigger = now
 
-            if score >= ALARM_HIGH or phone_flag:
+            if phone_flag:
+                start_alert("phone")
+                status_text = "DANGER ALERT: CELL PHONE DETECTED!"
+                # Draw thick red danger flashing border around frame
+                cv2.rectangle(frame, (0, 0), (w - 1, h - 1), (0, 0, 255), 10)
+            elif score >= ALARM_HIGH:
                 start_alert("high")
                 status_text = "CRITICAL RISK - ALARM"
+                cv2.rectangle(frame, (0, 0), (w - 1, h - 1), (0, 0, 255), 6)
             elif score >= ALARM_MEDIUM:
                 start_alert("medium")
                 status_text = "WARNING - SUSPICIOUS"
@@ -379,6 +416,9 @@ def main():
             
             draw_telemetry_panel(frame, telemetry_flags)
             draw_event_feed(frame, events)
+
+            global current_processed_frame
+            current_processed_frame = frame.copy()
 
             try:
                 cv2.imshow("Proctoring System", frame)

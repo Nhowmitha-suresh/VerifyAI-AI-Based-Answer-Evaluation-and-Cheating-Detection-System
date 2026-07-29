@@ -80,7 +80,7 @@ def generate_html_report(incident_logs: List[Dict[str, Any]] = None, gaze_heatma
     <div class="container">
         <div class="header">
             <div>
-                <h1>NegoSphere AI Enterprise Proctoring Audit Report</h1>
+                <h1>VerifyAI Enterprise Proctoring Audit Report</h1>
                 <p style="color: var(--text-dim); margin: 6px 0 0 0; font-size: 13px;">Generated on: {datetime.datetime.now().strftime("%B %d, %Y - %H:%M:%S")}</p>
             </div>
             <div class="verdict-badge">{verdict}</div>

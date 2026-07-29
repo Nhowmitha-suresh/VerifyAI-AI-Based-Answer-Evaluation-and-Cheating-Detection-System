@@ -16,17 +16,26 @@ VERIFICATION_WINDOW_SEC = 3.0
 ENABLE_HANDS = True
 ENABLE_OBJECT_DETECTION = True
 ENABLE_AUDIO = True
+ENABLE_SNAPSHOTS = False
 
 # Directories & Output Files
 SNAPSHOT_DIR = "snapshots"
 CSV_FILE = "proctor_log.csv"
 REPORT_FILE = "proctor_report.html"
 
-# Object Detection Model Paths & Classes
+# Object Detection & Confidence Thresholds
+FACE_CONF_THRESHOLD = 0.50
+OBJECT_CONF_THRESHOLD = 0.25
+NMS_THRESHOLD = 0.45
+TRACKING_PERSISTENCE_FRAMES = 3
+MIN_DETECTION_DURATION_SEC = 0.4
+
+# Object Detection Model Paths & COCO Class Mappings
 MODEL_PROTO_PATH = "mobile_net_ssd.prototxt"
 MODEL_WEIGHTS_PATH = "mobile_net_ssd.caffemodel"
 COCO_CLASSES = {
-    67: "cell phone", 73: "book", 63: "laptop", 65: "remote", 64: "mouse", 66: "keyboard"
+    67: "cell phone", 73: "book", 63: "laptop", 65: "remote", 64: "mouse", 66: "keyboard",
+    77: "cell phone", 72: "tv", 74: "clock"
 }
 
 # Audio Configuration

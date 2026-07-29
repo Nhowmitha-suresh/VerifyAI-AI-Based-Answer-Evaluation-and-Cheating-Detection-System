@@ -9,7 +9,7 @@ import time
 import logging
 import datetime
 import collections
-from .config import EVENT_WINDOW, CSV_FILE, SNAPSHOT_DIR
+from .config import EVENT_WINDOW, CSV_FILE, SNAPSHOT_DIR, ENABLE_SNAPSHOTS
 
 # Structured Logging Setup
 logger = logging.getLogger("AIProctor")
@@ -57,8 +57,10 @@ def log_event(label, score):
     except Exception as e:
         logger.error(f"Error writing to CSV log: {e}")
 
-def save_snapshot(frame, reason="violation"):
+def save_snapshot(frame, reason="violation", force=False):
     global snapshot_count
+    if not ENABLE_SNAPSHOTS and not force:
+        return None
     if frame is None or frame.size == 0:
         return None
     snapshot_count += 1

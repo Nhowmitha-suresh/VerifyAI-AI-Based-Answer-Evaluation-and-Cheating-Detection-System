@@ -1,0 +1,236 @@
+/* VerifyAI Minimal Luxury Enterprise SaaS Design System */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root, :root[data-theme="light"], html.light {
+  --bg-primary: #F8F6F2;
+  --card-bg: #FFFFFF;
+  --soft-brown: #8B6B4A;
+  --dark-brown: #5E4631;
+  --warm-beige: #EFE6DA;
+  --light-sand: #F5EFE6;
+  --muted-gold: #C7A15A;
+  --text-primary: #2E2A27;
+  --text-muted: #7A736D;
+  --border-color: #E8E1D8;
+  --border-gold: #C7A15A;
+  
+  --color-success: #5C8D4D;
+  --color-warning: #C79A4B;
+  --color-critical: #B85C4A;
+  --color-info: #8B6B4A;
+
+  --shadow-subtle: 0 4px 20px rgba(46, 42, 39, 0.04);
+  --shadow-card: 0 8px 30px rgba(46, 42, 39, 0.06);
+}
+
+:root[data-theme="dark"], html.dark {
+  --bg-primary: #1C1A18;
+  --card-bg: #262320;
+  --soft-brown: #D0B07B;
+  --dark-brown: #EFE6DA;
+  --warm-beige: #322E2A;
+  --light-sand: #2A2724;
+  --muted-gold: #D0B07B;
+  --text-primary: #FFFFFF;
+  --text-muted: #CFC7BC;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-gold: #D0B07B;
+
+  --color-success: #5C8D4D;
+  --color-warning: #C79A4B;
+  --color-critical: #B85C4A;
+  --color-info: #D0B07B;
+
+  --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Base Body System */
+body {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Luxury Minimalist Card Panels (18px Rounded Corners) */
+.luxury-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.luxury-card:hover {
+  border-color: var(--border-gold);
+  box-shadow: 0 12px 35px rgba(199, 161, 90, 0.08);
+}
+
+/* Camera Stage Box */
+.camera-stage-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: var(--light-sand);
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  transition: border-color 0.3s ease;
+}
+
+.camera-stage-container.active-camera {
+  border-color: var(--border-gold);
+}
+
+.camera-layer-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 1;
+}
+
+.camera-layer-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.camera-layer-hud {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Floating Label Inputs */
+.floating-input-group {
+  position: relative;
+}
+
+.floating-input {
+  width: 100%;
+  padding: 1.1rem 1.25rem 0.5rem 1.25rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.floating-input:focus {
+  border-color: var(--muted-gold);
+  box-shadow: 0 0 0 3px rgba(199, 161, 90, 0.15);
+}
+
+.floating-label {
+  position: absolute;
+  left: 1.25rem;
+  top: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.floating-input:focus ~ .floating-label,
+.floating-input:not(:placeholder-shown) ~ .floating-label {
+  top: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--muted-gold);
+  font-weight: 700;
+}
+
+/* Buttons System */
+.btn-primary {
+  background-color: var(--soft-brown);
+  color: #FFFFFF;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  box-shadow: var(--shadow-subtle);
+}
+
+.btn-primary:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--muted-gold);
+  background-color: var(--warm-beige);
+}
+
+.btn-danger {
+  background-color: var(--color-critical);
+  color: #FFFFFF;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 0.75rem 1.5rem;
+  transition: opacity 0.2s ease;
+}
+
+.btn-danger:hover {
+  opacity: 0.9;
+}
+
+/* Step Visibility Transitions */
+.step-section {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.step-section.hidden {
+  display: none !important;
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-gold);
+}

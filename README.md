@@ -1,74 +1,120 @@
-# AI Proctoring & Cheat Detection System
+# VerifyAI - Enterprise AI Examination Proctoring Platform 🚀
 
-An advanced, multi-modal AI Proctoring and Anti-Cheat Detection Suite built with Python, OpenCV, MediaPipe FaceMesh & Iris tracking, Web Audio API, and real-time Telemetry Analytics.
+[![System Type](https://img.shields.io/badge/System-AI%20Proctoring%20%26%20Behavioral%20Telemetry-8B6B4A)](http://localhost:8000)
+[![Framework](https://img.shields.io/badge/FastAPI-2.0.0-5C8D4D)](https://fastapi.tiangolo.com)
+[![Design Language](https://img.shields.io/badge/Design-Minimal%20Luxury%20SaaS-C7A15A)](http://localhost:8000)
+[![WebSockets](https://img.shields.io/badge/WebSockets-Real--Time-5C8D4D)](http://localhost:8000/ws)
 
-![System Type](https://img.shields.io/badge/System-AI%20Proctoring%20%26%20Anti--Cheat-blue)
-![Python](https://img.shields.io/badge/Python-3.9%2B-green)
-![Mobile Phone AI](https://img.shields.io/badge/Object%20Detection-Mobile%20Phone%20%26%20Gadgets-red)
+VerifyAI is an enterprise-grade, human-centered AI Examination Proctoring & Behavioral Telemetry Platform inspired by Apple, Notion, Stripe, and Arc Browser. Built with **FastAPI**, **OpenCV**, **MediaPipe**, **WebSockets**, and **Vanilla CSS/Tailwind**, it provides real-time MJPEG webcam streaming, 5-zone gaze tracking, 3D head pose estimation, mobile phone AI detection, automated evidence snapshotting, candidate identity verification, and self-contained exam audit reports.
 
 ---
 
 ## 🌟 Key Features
 
-### 1. Direct AI Mobile Phone & Forbidden Object Detection
-- **Mobile Phone AI Detector**: Real-time object detection using OpenCV DNN (MobileNet-SSD COCO) and geometric slab heuristics.
-- **Visual Bounding Boxes**: Highlights detected mobile phones directly on the camera feed with confidence ratings (`CELL PHONE 92%`).
-- **Critical Violation Trigger**: Instantly triggers high-risk audio alarms (+15 score points) and captures evidence snapshots to `snapshots/`.
+1. **Minimal Luxury SaaS Interface**:
+   - Designed with a calm, trustworthy aesthetic using Cream (`#F8F6F2`), Pure White cards (`#FFFFFF`), Soft Brown (`#8B6B4A`), and Muted Gold (`#C7A15A`).
+   - Supports Dual Themes (Light & Dark) with persisted user preferences.
+   - Zero cyberpunk, neon, or bright warning clutter.
 
-### 2. Active Window & Shortcut Proctoring (System Level)
-- **Active Window Tracker**: OS-level active window title tracking (flags when candidate switches focus away from exam to Browser, ChatGPT, Telegram, Discord, or Notepad).
-- **Shortcut & Focus Violation**: Automatically logs `window_switch` violations when window focus changes.
+2. **Complete Candidate Onboarding Workflow**:
+   - 7-Stage Flow: `Landing Page` → `Candidate Profile Entry` → `Permission Center` → `Camera Health Diagnostics` → `AI Calibration` → `Environment Check` → `Enterprise Live Dashboard`.
 
-### 3. Advanced Telemetry & Cheating Detection Suite
-- **Futuristic Glassmorphic HUD**: Cyberpunk overlay showing System Status badge, Active Window Title, FPS counter, Session Timer, and Live Risk Index (0-100%).
-- **5-Zone Gaze Tracking**: Precise iris center tracking (`CENTER`, `LOOKING LEFT`, `LOOKING RIGHT`, `LOOKING UP`, `LOOKING DOWN`).
-- **Rapid Gaze Scan Detector**: Tracks eye directional velocity to catch rapid scanning across off-screen cheat sheets.
-- **Head Down & Lap Glance Detector**: Detects head pitch down (>20 deg) combined with gaze looking down (looking at a phone hidden on lap).
-- **Secondary Screen / Phone Glow Detector**: Analyzes facial luminance variations to detect secondary monitor reflections or phone backlight glows on candidate's face.
-- **3D Head Pose Estimation**: Computes Pitch, Yaw, and Roll using `solvePnP` with 3D orientation axis projected on face.
-- **Hand & Gadget Proxy Detection**: Tracks hand landmarks near face or ear regions.
-- **Multi-Face & Occlusion Monitor**: Flags multiple persons or candidate absence.
-- **Voice & Collusion Detection**: Correlates audio energy with candidate mouth opening to detect secondary speakers.
-- **Drowsiness & Eyes Closed Monitor**: Tracks Eye Aspect Ratio (EAR) for prolonged eye closures.
+3. **Enterprise Camera Lifecycle State Machine**:
+   - Explicit state transitions: `INITIALIZING`, `DISCOVERING_CAMERA`, `REQUESTING_PERMISSION`, `CONNECTING`, `CONNECTED`, `STREAMING`, `WAITING_FOR_CANDIDATE`, `AI_PROCESSING`.
+   - Continuous diagnostic health checks for `BLACK_SCREEN` (brightness < 5.0), `CAMERA_FROZEN` (delta < 0.1), `CAMERA_BUSY` (process locking), `NO_CAMERA_FOUND`, and `PERMISSION_DENIED`.
+   - Diagnostic error cards with actionable recovery steps instead of blank rectangles.
 
-### 4. Automatic Evidence & Audit Reporting
-- **Automated Snapshots**: Saves timestamped frames into `snapshots/` folder upon mobile phone detection or high risk scores.
-- **CSV Incident Logging**: Logs all timestamped events to `proctor_log.csv`.
-- **Interactive HTML Audit Report**: Automatically compiles an audit report (`proctor_report.html`) complete with violation statistics, timeline, and snapshot gallery upon exit.
+4. **3-Layer Camera Feed & 60 FPS HUD Overlay**:
+   - Bottom Layer: HTML5 Video / MJPEG `/video_feed`.
+   - Middle Layer: 60 FPS `requestAnimationFrame` Canvas Overlay with smooth Exponential Moving Average (EMA) bounding box tracking.
+   - Top Layer: Real-time telemetry HUD displaying timestamp, resolution, FPS, latency, and status.
+
+5. **AI Explainability & Bounded Risk Engine**:
+   - Strictly bounds cumulative behavioral risk score between `0%` and `100%` across 5 danger tiers (`Safe`, `Low`, `Moderate`, `High`, `Critical`).
+   - Itemized score breakdown detailing exact contributing factors (`Phone Detected: +30`, `Offscreen Gaze: +5`, `Multiple Faces: +25`).
+
+6. **High-Frequency Telemetry & Incident Recording**:
+   - Real-time WebSocket channel broadcasting candidate telemetry every 100ms.
+   - Automatic date-partitioned evidence snapshotting (`snapshots/YYYY-MM-DD/`) and self-contained HTML session audit reports (`reports/proctor_report.html`).
 
 ---
 
-## 🚀 Quick Start & Installation
+## 🏛️ System Architecture
 
-### Prerequisites
-- Python 3.9+
-- Webcam & Microphone
+```
+                               ┌────────────────────────────────────────┐
+                               │        Candidate Browser Client        │
+                               │  (Minimal Luxury SaaS Dashboard UI)    │
+                               └───────────────────┬────────────────────┘
+                                                   │
+                                     HTTP / WebSocket Telemetry (100ms)
+                                                   │
+                               ┌───────────────────▼────────────────────┐
+                               │           FastAPI Backend Server       │
+                               │     (REST API & WebSocket Manager)     │
+                               └─────────┬────────────────────┬─────────┘
+                                         │                    │
+                    ┌────────────────────▼─────┐        ┌─────▼────────────────────┐
+                    │ Multi-Modal Vision Engine│        │ Behavioral Risk Engine   │
+                    │  • MobileNet-SSD Caffe   │        │  • Bounded 0-100% Index  │
+                    │  • MediaPipe Gaze & Pose │        │  • Explainability Engine │
+                    └──────────────────────────┘        └──────────────────────────┘
+```
 
-### Installation
+---
+
+## 🚀 Quick Start
+
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Running the Python Engine
+### 2. Launch FastAPI Web Application
 ```bash
-python eye_movement_cheat_alarm.py
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-### Running the Web Proctoring Dashboard
-Open `face_landmarks_mediapipe.html` in Google Chrome or Microsoft Edge, or serve via HTTP:
-
-```bash
-python -m http.server 8000
-```
-Then open `http://localhost:8000/face_landmarks_mediapipe.html`.
+### 3. Open Browser Dashboard
+Navigate to **[http://localhost:8000](http://localhost:8000)** in Google Chrome or Microsoft Edge.
 
 ---
 
-## ⌨️ Interactive Keyboard Controls (Python App)
+## 📡 API Endpoints Reference
 
-| Key | Action |
-| --- | --- |
-| `C` | Recalibrate gaze center baseline |
-| `R` | Reset cumulative risk score to 0.0 |
-| `S` | Manually capture an evidence snapshot |
-| `Q` or `ESC` | Exit application and auto-generate `proctor_report.html` |
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/` or `/dashboard` | Minimal Luxury Enterprise Dashboard UI |
+| `GET` | `/video_feed` | Asynchronous MJPEG Video Stream |
+| `GET` | `/status` | Exam session status & system health |
+| `GET` | `/health` | Subsystem health check endpoint |
+| `GET` | `/risk` | Current risk score & severity breakdown |
+| `GET` | `/events` | Logged incident timeline events |
+| `GET` | `/snapshots` | Evidence snapshot gallery list |
+| `GET` | `/report` | HTML exam audit report export |
+| `POST` | `/start` | Start proctoring session |
+| `POST` | `/pause` | Pause proctoring session |
+| `POST` | `/resume` | Resume proctoring session |
+| `POST` | `/stop` | Stop session & export HTML audit report |
+| `POST` | `/snapshot` | Capture manual evidence snapshot |
+| `POST` | `/recalibrate` | Recalibrate gaze baseline to center |
+| `POST` | `/reset-risk` | Reset cumulative risk score index |
+| `WS` | `/ws` | High-frequency WebSocket telemetry stream (~100ms) |
+
+---
+
+## 🐳 Docker Deployment
+
+Run with Docker Compose:
+```bash
+docker-compose up --build
+```
+Open **[http://localhost:8000](http://localhost:8000)**.
+
+---
+
+## 📄 License & Contributors
+
+- **Author / Lead Engineer**: Nhowmitha Suresh
+- **Repository**: [VerifyAI AI-Based Answer Evaluation and Cheating Detection System](https://github.com/Nhowmitha-suresh/VerifyAI-AI-Based-Answer-Evaluation-and-Cheating-Detection-System.git)
+- **License**: MIT License

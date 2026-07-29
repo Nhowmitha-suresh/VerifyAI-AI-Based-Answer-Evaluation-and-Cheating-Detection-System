@@ -1,21 +1,44 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Proctoring output logs & evidence snapshots
+# Logs & Virtual Environments
+logs/
+*.log
+venv/
+.venv/
+ENV/
+
+# Node / Web
+node_modules/
+package-lock.json
+
+# Runtime Artifacts & Evidence
 snapshots/
+reports/
 proctor_log.csv
 proctor_report.html
 
-# Caffe / DNN downloaded model weights
-*.caffemodel
-*.onnx
-
-# Virtual environments & IDEs
-venv/
-.venv/
-env/
-.idea/
+# IDEs
 .vscode/
+.idea/
+*.swp

@@ -82,16 +82,24 @@ def start_alert(mode):
     elif mode == "medium":
         threading.Thread(target=lambda: (beep(1000, 300), time.sleep(0.1), beep(1000, 300)), daemon=True).start()
         speak_async("Warning: Suspicious behavior detected.")
-    elif mode == "high":
+    elif mode in ["high", "danger", "phone"]:
         def loop():
             while True:
                 with _alarm_lock:
                     if _stop_alarm:
                         break
-                beep(1300, 400)
-                time.sleep(0.15)
+                beep(1400, 250)
+                time.sleep(0.08)
+                with _alarm_lock:
+                    if _stop_alarm:
+                        break
+                beep(1050, 250)
+                time.sleep(0.10)
         threading.Thread(target=loop, daemon=True).start()
-        speak_async("High risk alert: Proctoring violation threshold exceeded!")
+        if mode == "phone":
+            speak_async("DANGER ALERT! CELL PHONE DETECTED! PROCTORING VIOLATION!")
+        else:
+            speak_async("DANGER ALERT! HIGH RISK PROCTORING VIOLATION THRESHOLD EXCEEDED!")
 
 def stop_alerts():
     global _alarm_mode, _stop_alarm

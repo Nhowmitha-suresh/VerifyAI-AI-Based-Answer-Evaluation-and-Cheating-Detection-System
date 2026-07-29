@@ -24,7 +24,7 @@ class EyeTracker:
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             max_num_faces=1,
-            refine_landmarks=True,
+            refine_landmarks=False,
             min_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence
         )

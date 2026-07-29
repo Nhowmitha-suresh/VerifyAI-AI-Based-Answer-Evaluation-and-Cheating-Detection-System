@@ -22,7 +22,7 @@ def draw_hud_header(frame, fps, elapsed_sec, score, status_text, window_title):
     h, w = frame.shape[:2]
     draw_hud_panel(frame, 10, 10, w - 20, 60, bg_color=(10, 15, 25), alpha=0.75, border_color=(0, 230, 255))
     
-    cv2.putText(frame, "NEGOSPHERE AI PROCTORING ENGINE", (25, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+    cv2.putText(frame, "VERIFYAI PROCTORING SYSTEM", (25, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
     cv2.putText(frame, f"Active Window: {window_title[:28]}", (25, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 200, 220), 1)
     
     if score >= ALARM_HIGH:
