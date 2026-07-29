@@ -54,10 +54,16 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
             
             latest_event_desc = app_state.events[-1].get("description") if app_state.events else "Candidate behavior normal."
 
+            phone_det = telemetry.get("phone_detected", False)
+            danger = phone_det or (app_state.severity in ["CRITICAL", "HIGH_RISK"])
+            danger_msg = "🚨 DANGER ALERT: CELL PHONE DETECTED IN REAL-TIME!" if phone_det else ("🚨 DANGER ALERT: HIGH RISK PROCTORING VIOLATION!" if danger else "")
+
             payload = {
                 "risk": app_state.risk_score,
                 "peak_risk": app_state.peak_risk_score,
                 "severity": app_state.severity,
+                "danger_alert": danger,
+                "danger_message": danger_msg,
                 "gaze_direction": telemetry.get("gaze_direction", "CENTER"),
                 "looking_left": telemetry.get("looking_left", False),
                 "looking_right": telemetry.get("looking_right", False),

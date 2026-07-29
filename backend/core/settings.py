@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     ENABLE_HANDS: bool = True
     ENABLE_OBJECT_DETECTION: bool = True
     ENABLE_AUDIO: bool = True
+    ENABLE_SNAPSHOTS: bool = False
 
     # Directories
     SNAPSHOT_DIR: str = "snapshots"

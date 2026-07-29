@@ -5,6 +5,9 @@ snapshots, HTML report, and session control actions.
 """
 
 import os
+import cv2
+import base64
+import numpy as np
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from typing import Dict, Any
@@ -39,6 +42,29 @@ def video_feed():
         webcam_service.get_mjpeg_stream(),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+@router.post("/telemetry/update")
+@router.post("/api/telemetry/update")
+def update_telemetry(payload: Dict[str, Any]):
+    frame_b64 = payload.pop("frame_b64", None)
+    if frame_b64:
+        try:
+            img_bytes = base64.b64decode(frame_b64)
+            np_arr = np.frombuffer(img_bytes, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if frame is not None:
+                webcam_service.set_external_frame(frame)
+        except Exception as e:
+            logger.debug(f"Error decoding telemetry frame: {e}")
+
+    with app_state.state_lock:
+        if "risk_score" in payload:
+            app_state.risk_score = float(payload["risk_score"])
+            app_state.peak_risk_score = max(app_state.peak_risk_score, app_state.risk_score)
+        if "severity" in payload:
+            app_state.severity = payload["severity"]
+        app_state.telemetry_data.update(payload)
+    return {"status": "OK"}
 
 @router.get("/health")
 @router.get("/api/health")
