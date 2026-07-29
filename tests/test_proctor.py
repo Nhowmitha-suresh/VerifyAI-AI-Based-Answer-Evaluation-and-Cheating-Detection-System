@@ -72,7 +72,7 @@ class TestProctorSuite(unittest.TestCase):
     def test_07_snapshot_saving(self):
         """Test saving evidence snapshot image."""
         dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        filepath = save_snapshot(dummy_frame, reason="test")
+        filepath = save_snapshot(dummy_frame, reason="test", force=True)
         self.assertIsNotNone(filepath)
         self.assertTrue(os.path.exists(filepath))
 
