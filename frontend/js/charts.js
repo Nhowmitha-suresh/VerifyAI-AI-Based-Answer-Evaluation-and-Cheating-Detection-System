@@ -1,24 +1,27 @@
 /**
- * Live Chart.js Risk Score Progression Chart Manager.
+ * VerifyAI Minimal Luxury Chart Manager.
+ * Uses warm beige, muted gold, and soft brown palette.
  */
 
 let riskChart = null;
 
 function initRiskChart(canvasId) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     
-    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
-    gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 160);
+    gradient.addColorStop(0, 'rgba(199, 161, 90, 0.25)');
+    gradient.addColorStop(1, 'rgba(199, 161, 90, 0.0)');
 
     riskChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [{
-                label: 'Risk Score %',
+                label: 'Risk Index %',
                 data: [],
-                borderColor: '#ef4444',
+                borderColor: '#C7A15A',
                 borderWidth: 2,
                 backgroundColor: gradient,
                 fill: true,
@@ -39,10 +42,10 @@ function initRiskChart(canvasId) {
                     min: 0,
                     max: 100,
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.05)'
+                        color: 'rgba(139, 107, 74, 0.1)'
                     },
                     ticks: {
-                        color: '#94a3b8',
+                        color: '#7A736D',
                         font: { size: 10 }
                     }
                 }
@@ -64,7 +67,6 @@ function updateRiskChart(timestamp, riskValue) {
     riskChart.data.labels.push(timestamp);
     riskChart.data.datasets[0].data.push(riskValue);
 
-    // Keep sliding window of 40 data points
     if (riskChart.data.labels.length > 40) {
         riskChart.data.labels.shift();
         riskChart.data.datasets[0].data.shift();
