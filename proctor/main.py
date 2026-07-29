@@ -39,11 +39,16 @@ from .report import generate_html_report
 
 import urllib.request
 import json
+import base64
 import threading
 
-def sync_telemetry_to_backend(payload):
+def sync_telemetry_to_backend(payload, frame=None):
     def _post():
         try:
+            if frame is not None and frame.size > 0:
+                ret, buf = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 65])
+                if ret:
+                    payload["frame_b64"] = base64.b64encode(buf.tobytes()).decode('ascii')
             req = urllib.request.Request(
                 "http://localhost:8000/api/telemetry/update",
                 data=json.dumps(payload).encode("utf-8"),
@@ -381,7 +386,7 @@ def main():
                 "risk_score": score,
                 "severity": risk_eval["severity"],
                 "explanation": explanation
-            })
+            }, frame=frame)
 
             # Trigger Incident Video Recording on High Risk
             if score >= ALARM_HIGH and (now - last_incident_trigger > 12.0):
@@ -389,9 +394,15 @@ def main():
                 save_snapshot(frame, reason="high_risk")
                 last_incident_trigger = now
 
-            if score >= ALARM_HIGH or phone_flag:
+            if phone_flag:
+                start_alert("phone")
+                status_text = "DANGER ALERT: CELL PHONE DETECTED!"
+                # Draw thick red danger flashing border around frame
+                cv2.rectangle(frame, (0, 0), (w - 1, h - 1), (0, 0, 255), 10)
+            elif score >= ALARM_HIGH:
                 start_alert("high")
                 status_text = "CRITICAL RISK - ALARM"
+                cv2.rectangle(frame, (0, 0), (w - 1, h - 1), (0, 0, 255), 6)
             elif score >= ALARM_MEDIUM:
                 start_alert("medium")
                 status_text = "WARNING - SUSPICIOUS"
