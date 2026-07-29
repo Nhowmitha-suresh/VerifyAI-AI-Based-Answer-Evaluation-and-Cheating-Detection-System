@@ -1,189 +1,656 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="light" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VerifyAI - AI Proctoring & Cheating Detection Platform</title>
+    <title>VerifyAI - Enterprise AI Examination Proctoring Platform</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Custom CSS Styles -->
+    <!-- Custom Design System CSS -->
     <link rel="stylesheet" href="/css/styles.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white">
+<body class="bg-[var(--bg-primary)] text-[var(--text-primary)] min-h-screen flex flex-col font-sans antialiased selection:bg-[var(--muted-gold)] selection:text-white relative">
 
-    <!-- Top Navigation Bar -->
-    <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex justify-between items-center shadow-lg">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+    <!-- ========================================================= -->
+    <!-- STAGE 1: MINIMAL ELEGANT LANDING HERO -->
+    <!-- ========================================================= -->
+    <section id="stepLanding" class="step-section min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-10">
+        <div class="max-w-4xl w-full text-center flex flex-col items-center gap-8">
+            <!-- Top Right Theme Switcher -->
+            <div class="absolute top-6 right-6">
+                <button onclick="toggleTheme()" class="px-4 py-2 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-semibold flex items-center gap-2 shadow-sm hover:border-[var(--muted-gold)] transition-all">
+                    <span id="themeIcon">☀️</span>
+                    <span id="themeLabel">Light Mode</span>
+                </button>
             </div>
-            <div>
-                <h1 class="text-xl font-black bg-gradient-to-r from-blue-400 via-indigo-300 to-slate-100 bg-clip-text text-transparent tracking-tight">VerifyAI Proctoring Platform</h1>
-                <p class="text-xs text-slate-400 font-medium">Real-Time Multi-Modal AI Anti-Cheat Telemetry</p>
+
+            <!-- Brand Badge -->
+            <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[var(--warm-beige)] text-[var(--dark-brown)] text-xs font-semibold tracking-wide">
+                <span>🛡️</span> VerifyAI Enterprise Platform
+            </div>
+
+            <!-- Logo & Title -->
+            <div class="flex flex-col items-center gap-3">
+                <div class="w-16 h-16 rounded-2xl bg-[var(--dark-brown)] text-[var(--warm-beige)] flex items-center justify-center text-2xl font-black shadow-md mb-2">
+                    V
+                </div>
+                <h1 class="text-5xl sm:text-6xl font-extrabold text-[var(--text-primary)] tracking-tight">
+                    VerifyAI
+                </h1>
+                <p class="text-lg sm:text-xl font-normal text-[var(--text-muted)] tracking-wide max-w-xl leading-relaxed">
+                    Intelligent, human-centered examination proctoring and behavioral integrity management.
+                </p>
+            </div>
+
+            <!-- Subtitle Feature Pills -->
+            <div class="flex flex-wrap justify-center gap-2.5 max-w-2xl">
+                <span class="px-3.5 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-muted)]">Gaze & Eye Tracking</span>
+                <span class="px-3.5 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-muted)]">Identity Verification</span>
+                <span class="px-3.5 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-muted)]">Mobile Detection</span>
+                <span class="px-3.5 py-1.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-muted)]">Explainable Risk Engine</span>
+            </div>
+
+            <!-- CTA Button -->
+            <div class="mt-4">
+                <button onclick="switchStep('stepCandidate')" class="btn-primary flex items-center gap-2.5 text-sm">
+                    <span>Start Secure Examination</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
             </div>
         </div>
+    </section>
 
-        <!-- Session Status & Timers -->
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 px-3.5 py-1.5 rounded-lg text-xs font-mono">
-                <span class="text-slate-400">EXAM DURATION:</span>
-                <span id="txtDuration" class="font-bold text-blue-400 text-sm">00:00</span>
+    <!-- ========================================================= -->
+    <!-- STAGE 2: CANDIDATE INFORMATION ENTRY -->
+    <!-- ========================================================= -->
+    <section id="stepCandidate" class="step-section hidden min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-10">
+        <div class="max-w-xl w-full luxury-card p-8 sm:p-10 relative">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center text-base font-bold">
+                    1
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-[var(--text-primary)] tracking-tight">Candidate Profile</h2>
+                    <p class="text-xs text-[var(--text-muted)]">Enter credentials to proceed with your assessment.</p>
+                </div>
             </div>
 
-            <div id="wsStatusBadge" class="px-3 py-1 text-xs font-semibold rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                CONNECTING...
-            </div>
+            <form id="candidateForm" onsubmit="event.preventDefault(); saveCandidateInfo();" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputName" required placeholder=" " value="Alex Johnson" class="floating-input">
+                    <label class="floating-label">Candidate Name *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputRegNo" required placeholder=" " value="REG-2026-8941" class="floating-input">
+                    <label class="floating-label">Register Number *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputDept" required placeholder=" " value="Computer Science & Eng" class="floating-input">
+                    <label class="floating-label">Department *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputCollege" required placeholder=" " value="Institute of Technology" class="floating-input">
+                    <label class="floating-label">Institution / College *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputExamName" required placeholder=" " value="AI & Machine Learning Assessment" class="floating-input">
+                    <label class="floating-label">Exam Name *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputSubject" required placeholder=" " value="CS801 - Computer Vision" class="floating-input">
+                    <label class="floating-label">Subject Code *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="text" id="inputDuration" required placeholder=" " value="60 Minutes" class="floating-input">
+                    <label class="floating-label">Duration *</label>
+                </div>
+
+                <div class="floating-input-group col-span-2 sm:col-span-1">
+                    <input type="email" id="inputEmail" placeholder=" " value="alex.johnson@university.edu" class="floating-input">
+                    <label class="floating-label">Email (Optional)</label>
+                </div>
+
+                <div class="col-span-2 mt-4 flex justify-between items-center">
+                    <button type="button" onclick="switchStep('stepLanding')" class="btn-secondary text-xs py-2 px-4">
+                        ← Back
+                    </button>
+                    <button type="submit" class="btn-primary text-xs py-2.5 px-6">
+                        Continue →
+                    </button>
+                </div>
+            </form>
         </div>
+    </section>
 
-        <!-- Control Action Toolbar -->
-        <div class="flex items-center gap-2">
-            <button id="btnStart" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 active:scale-95">▶ Start</button>
-            <button id="btnPause" class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition-all shadow-md shadow-amber-600/20 active:scale-95">⏸ Pause</button>
-            <button id="btnResume" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-md shadow-blue-600/20 active:scale-95">⏯ Resume</button>
-            <button id="btnSnapshot" class="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-all shadow-md shadow-purple-600/20 active:scale-95">📸 Snapshot</button>
-            <button id="btnRecalibrate" class="px-3.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-xs transition-all active:scale-95">🎯 Recalibrate</button>
-            <button id="btnResetRisk" class="px-3.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-600/40 text-rose-300 font-semibold text-xs transition-all active:scale-95">🔄 Reset Risk</button>
-            <a href="/report" target="_blank" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md shadow-indigo-600/20">📄 Report</a>
-        </div>
-    </header>
-
-    <!-- Main Dashboard Grid Content -->
-    <main class="flex-1 p-6 grid grid-cols-12 gap-6 max-w-[1920px] mx-auto w-full">
-
-        <!-- Left Column: Video Feed & Subsystems (7 Cols) -->
-        <section class="col-span-12 lg:col-span-7 flex flex-col gap-6">
-
-            <!-- Primary Webcam Player Box -->
-            <div class="glass-panel rounded-2xl p-4 flex flex-col relative overflow-hidden shadow-2xl">
-                <div class="flex justify-between items-center mb-3">
-                    <div class="flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
-                        <h2 class="text-sm font-bold text-slate-200 tracking-wide uppercase">Live Candidate Video Feed</h2>
-                    </div>
-                    <div class="flex items-center gap-3 text-xs font-mono">
-                        <span id="txtFps" class="px-2.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-bold border border-slate-700">0.0 FPS</span>
-                        <span id="txtActiveWindow" class="px-2.5 py-0.5 rounded bg-slate-800 text-slate-300 truncate max-w-[200px] border border-slate-700">Exam Browser</span>
-                    </div>
+    <!-- ========================================================= -->
+    <!-- STAGE 3: PERMISSION CENTER SECURITY CHECKPOINT -->
+    <!-- ========================================================= -->
+    <section id="stepPermissions" class="step-section hidden min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-10">
+        <div class="max-w-3xl w-full flex flex-col gap-6">
+            <div class="text-center flex flex-col items-center gap-2">
+                <div class="w-10 h-10 rounded-xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center text-base font-bold">
+                    2
                 </div>
-
-                <!-- Video Feed Player Container -->
-                <div class="relative w-full aspect-video rounded-xl bg-slate-950 overflow-hidden border border-slate-800 shadow-inner flex items-center justify-center">
-                    <img id="videoFeedStream" src="/video_feed" alt="Live Proctoring Video Feed" class="w-full h-full object-contain">
-                </div>
-
-                <!-- Status Overlay Pills under video -->
-                <div class="grid grid-cols-4 gap-3 mt-4">
-                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-center">
-                        <p class="text-[11px] text-slate-400 font-medium mb-1">Face Status</p>
-                        <span id="pillFace" class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">VERIFIED</span>
-                    </div>
-                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-center">
-                        <p class="text-[11px] text-slate-400 font-medium mb-1">Multi-Face Monitor</p>
-                        <span id="pillMultiFace" class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">SINGLE</span>
-                    </div>
-                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-center">
-                        <p class="text-[11px] text-slate-400 font-medium mb-1">Mobile Phone AI</p>
-                        <span id="pillPhone" class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">CLEAR</span>
-                    </div>
-                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-center">
-                        <p class="text-[11px] text-slate-400 font-medium mb-1">Head Orientation</p>
-                        <span id="pillHeadTurn" class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">CENTERED</span>
-                    </div>
-                </div>
+                <h2 class="text-2xl font-bold text-[var(--text-primary)] tracking-tight">System Permissions</h2>
+                <p class="text-xs text-[var(--text-muted)]">Authorize required hardware access to enable secure monitoring.</p>
             </div>
 
-            <!-- Gaze & Iris Analytics Cards -->
-            <div class="glass-panel rounded-2xl p-5 flex flex-col gap-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-sm font-bold text-slate-200 tracking-wide uppercase flex items-center gap-2">
-                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        5-Zone Gaze Telemetry & Iris Analytics
-                    </h3>
-                    <span id="txtGazeDir" class="text-xs font-mono font-bold px-3 py-1 rounded-md bg-blue-950 text-blue-300 border border-blue-500/40">CENTER</span>
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <span id="pillLeft" class="px-2.5 py-1 text-xs font-medium rounded bg-slate-800 text-slate-400 border border-slate-700">LOOKING LEFT</span>
-                    <span id="pillRight" class="px-2.5 py-1 text-xs font-medium rounded bg-slate-800 text-slate-400 border border-slate-700">LOOKING RIGHT</span>
-                    <span id="pillUp" class="px-2.5 py-1 text-xs font-medium rounded bg-slate-800 text-slate-400 border border-slate-700">LOOKING UP</span>
-                    <span id="pillDown" class="px-2.5 py-1 text-xs font-medium rounded bg-slate-800 text-slate-400 border border-slate-700">LOOKING DOWN</span>
-                    <span id="pillOffscreen" class="px-2.5 py-1 text-xs font-medium rounded bg-slate-800 text-slate-400 border border-slate-700">OFFSCREEN GAZE</span>
-                    <span id="pillRapid" class="px-2.5 py-1 text-xs font-medium rounded bg-slate-800 text-slate-400 border border-slate-700">RAPID SCANNING</span>
-                </div>
-            </div>
-
-            <!-- Evidence Snapshots Gallery -->
-            <div class="glass-panel rounded-2xl p-5 flex flex-col gap-3">
-                <h3 class="text-sm font-bold text-slate-200 tracking-wide uppercase">Automated Snapshot Evidence Gallery</h3>
-                <div id="snapshotGallery" class="grid grid-cols-4 gap-3">
-                    <p class="text-xs text-slate-500 col-span-4 text-center py-4">No evidence snapshots captured yet.</p>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Right Column: Live Risk Gauge, System Health & Events (5 Cols) -->
-        <section class="col-span-12 lg:col-span-5 flex flex-col gap-6">
-
-            <!-- Live Risk Engine Gauge & Meter -->
-            <div class="glass-panel-glow rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden">
-                <div class="flex justify-between items-center">
+            <!-- Permission Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div id="permCardCamera" class="luxury-card p-5 flex flex-col justify-between gap-4">
+                    <div class="flex justify-between items-start">
+                        <div class="w-9 h-9 rounded-lg bg-[var(--light-sand)] text-[var(--soft-brown)] flex items-center justify-center text-base">📷</div>
+                        <span id="badgePermCamera" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--warm-beige)] text-[var(--dark-brown)]">Waiting</span>
+                    </div>
                     <div>
-                        <h2 class="text-base font-extrabold text-slate-100 tracking-wide uppercase">AI Behavioral Risk Engine</h2>
-                        <p class="text-xs text-slate-400">Live Cumulative Violation Threat Index</p>
+                        <h3 class="text-sm font-bold text-[var(--text-primary)]">Camera Access</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-1">Required for face detection and optical tracking.</p>
                     </div>
-                    <span id="txtSeverityBadge" class="px-2.5 py-0.5 text-xs font-bold rounded bg-emerald-950 text-emerald-400 border border-emerald-500/40">NORMAL</span>
+                    <button onclick="requestPerm('Camera')" id="btnPermCamera" class="btn-secondary w-full text-xs py-1.5">Allow Camera</button>
                 </div>
 
-                <!-- Risk Score Number & Bar -->
-                <div class="flex items-baseline justify-between mt-2">
-                    <span id="txtRiskScore" class="text-5xl font-black font-mono text-slate-100 tracking-tight">0.0%</span>
-                    <span id="txtPeakRisk" class="text-xs font-mono font-bold text-slate-400">PEAK: 0.0%</span>
+                <div id="permCardMic" class="luxury-card p-5 flex flex-col justify-between gap-4">
+                    <div class="flex justify-between items-start">
+                        <div class="w-9 h-9 rounded-lg bg-[var(--light-sand)] text-[var(--soft-brown)] flex items-center justify-center text-base">🎙️</div>
+                        <span id="badgePermMic" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--warm-beige)] text-[var(--dark-brown)]">Waiting</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--text-primary)]">Microphone</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-1">Monitors acoustic energy and voice activity.</p>
+                    </div>
+                    <button onclick="requestPerm('Mic')" id="btnPermMic" class="btn-secondary w-full text-xs py-1.5">Allow Microphone</button>
                 </div>
 
-                <div class="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                    <div id="riskProgressBar" class="h-full rounded-full transition-all duration-300 bg-emerald-500" style="width: 0%;"></div>
+                <div id="permCardScreen" class="luxury-card p-5 flex flex-col justify-between gap-4">
+                    <div class="flex justify-between items-start">
+                        <div class="w-9 h-9 rounded-lg bg-[var(--light-sand)] text-[var(--soft-brown)] flex items-center justify-center text-base">🖥️</div>
+                        <span id="badgePermScreen" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--warm-beige)] text-[var(--dark-brown)]">Waiting</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--text-primary)]">Window Monitor</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-1">Tracks application focus during assessment.</p>
+                    </div>
+                    <button onclick="requestPerm('Screen')" id="btnPermScreen" class="btn-secondary w-full text-xs py-1.5">Authorize Monitor</button>
+                </div>
+
+                <div id="permCardNotify" class="luxury-card p-5 flex flex-col justify-between gap-4">
+                    <div class="flex justify-between items-start">
+                        <div class="w-9 h-9 rounded-lg bg-[var(--light-sand)] text-[var(--soft-brown)] flex items-center justify-center text-base">🔔</div>
+                        <span id="badgePermNotify" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--warm-beige)] text-[var(--dark-brown)]">Waiting</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--text-primary)]">Notifications</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-1">Delivers security alerts during proctoring.</p>
+                    </div>
+                    <button onclick="requestPerm('Notify')" id="btnPermNotify" class="btn-secondary w-full text-xs py-1.5">Enable Alerts</button>
+                </div>
+
+                <div id="permCardFullscreen" class="luxury-card p-5 flex flex-col justify-between gap-4">
+                    <div class="flex justify-between items-start">
+                        <div class="w-9 h-9 rounded-lg bg-[var(--light-sand)] text-[var(--soft-brown)] flex items-center justify-center text-base">⛶</div>
+                        <span id="badgePermFullscreen" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--warm-beige)] text-[var(--dark-brown)]">Waiting</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--text-primary)]">Fullscreen Lock</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-1">Enforces full-screen focus workspace mode.</p>
+                    </div>
+                    <button onclick="requestPerm('Fullscreen')" id="btnPermFullscreen" class="btn-secondary w-full text-xs py-1.5">Enable Fullscreen</button>
+                </div>
+
+                <div id="permCardClipboard" class="luxury-card p-5 flex flex-col justify-between gap-4">
+                    <div class="flex justify-between items-start">
+                        <div class="w-9 h-9 rounded-lg bg-[var(--light-sand)] text-[var(--soft-brown)] flex items-center justify-center text-base">📋</div>
+                        <span id="badgePermClipboard" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--warm-beige)] text-[var(--dark-brown)]">Waiting</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--text-primary)]">Clipboard Guard</h3>
+                        <p class="text-xs text-[var(--text-muted)] mt-1">Prevents unauthorized copy-paste operations.</p>
+                    </div>
+                    <button onclick="requestPerm('Clipboard')" id="btnPermClipboard" class="btn-secondary w-full text-xs py-1.5">Authorize Guard</button>
                 </div>
             </div>
 
-            <!-- Live Risk Score Chart.js Graph -->
-            <div class="glass-panel rounded-2xl p-5 flex flex-col gap-3">
-                <h3 class="text-sm font-bold text-slate-200 tracking-wide uppercase">Live Risk Score Trend</h3>
-                <div class="w-full h-40">
-                    <canvas id="riskChartCanvas"></canvas>
+            <!-- Action Controls -->
+            <div class="mt-4 flex justify-between items-center">
+                <button onclick="switchStep('stepCandidate')" class="btn-secondary text-xs py-2 px-4">
+                    ← Back
+                </button>
+                <button id="btnContinuePermissions" onclick="switchStep('stepCameraDiagnostics')" disabled class="btn-secondary text-xs py-2 px-6 opacity-50 cursor-not-allowed">
+                    Proceed to Camera Diagnostics →
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- STAGE 4: COMPLETE CAMERA HEALTH DIAGNOSTICS -->
+    <!-- ========================================================= -->
+    <section id="stepCameraDiagnostics" class="step-section hidden min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-10">
+        <div class="max-w-4xl w-full flex flex-col gap-6">
+            <div class="text-center flex flex-col items-center gap-2">
+                <div class="w-10 h-10 rounded-xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center text-base font-bold">
+                    3
+                </div>
+                <h2 class="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Camera Health Diagnostics</h2>
+                <p class="text-xs text-[var(--text-muted)]">Verifying camera connection, frame brightness, and AI stream health.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Health Matrix -->
+                <div class="lg:col-span-6 luxury-card p-6 flex flex-col justify-between gap-4">
+                    <h3 class="text-sm font-bold text-[var(--text-primary)]">Subsystem Matrix</h3>
+                    
+                    <div class="flex flex-col gap-2 text-xs">
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span>Camera Available</span>
+                            <span class="text-[var(--color-success)] font-semibold">✓ Connected</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span>Camera Permission</span>
+                            <span class="text-[var(--color-success)] font-semibold">✓ Granted</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span>Video Stream</span>
+                            <span class="text-[var(--color-success)] font-semibold">✓ Active</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span>Resolution & FPS</span>
+                            <span class="font-mono text-[var(--soft-brown)]">1280x720 (30 FPS)</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span>Brightness & Contrast</span>
+                            <span class="text-[var(--color-success)] font-semibold">✓ Optimal (84%)</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span>AI Pipeline & WS</span>
+                            <span class="text-[var(--color-success)] font-semibold">✓ Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Window -->
+                <div class="lg:col-span-6 luxury-card p-4 flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-2 text-xs">
+                        <span class="font-semibold text-[var(--text-primary)]">Optical Feed Preview</span>
+                        <span class="font-mono text-[var(--text-muted)]">HD 720P</span>
+                    </div>
+
+                    <div class="relative w-full aspect-video rounded-xl bg-[var(--light-sand)] overflow-hidden border border-[var(--border-color)] flex items-center justify-center">
+                        <video id="diagWebcamVideo" autoplay playsinline muted class="w-full h-full object-contain hidden"></video>
+                        <img id="diagVideoStream" src="/video_feed" alt="Camera Feed" class="w-full h-full object-contain">
+                    </div>
+
+                    <p class="mt-3 text-[11px] text-[var(--text-muted)]">
+                        Hardware diagnostics complete. Optical parameters verified.
+                    </p>
                 </div>
             </div>
 
-            <!-- System Health & Blinks Grid -->
-            <div class="grid grid-cols-3 gap-4">
-                <div class="glass-panel p-4 rounded-xl text-center">
-                    <p class="text-[11px] text-slate-400 font-medium">Blinks</p>
-                    <p id="txtBlinks" class="text-xl font-bold font-mono text-blue-400 mt-1">0</p>
+            <!-- Action Controls -->
+            <div class="mt-4 flex justify-between items-center">
+                <button onclick="switchStep('stepPermissions')" class="btn-secondary text-xs py-2 px-4">
+                    ← Back
+                </button>
+                <button onclick="switchStep('stepCalibration')" class="btn-primary text-xs py-2.5 px-6">
+                    Proceed to Calibration →
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- STAGE 5: AI GAZE & BIOMETRIC CALIBRATION SEQUENCE -->
+    <!-- ========================================================= -->
+    <section id="stepCalibration" class="step-section hidden min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-10">
+        <div class="max-w-2xl w-full luxury-card p-8 sm:p-10 flex flex-col items-center text-center gap-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center text-base font-bold">
+                    4
                 </div>
-                <div class="glass-panel p-4 rounded-xl text-center">
-                    <p class="text-[11px] text-slate-400 font-medium">CPU Usage</p>
-                    <p id="txtCpu" class="text-xl font-bold font-mono text-indigo-400 mt-1">0%</p>
-                </div>
-                <div class="glass-panel p-4 rounded-xl text-center">
-                    <p class="text-[11px] text-slate-400 font-medium">RAM Usage</p>
-                    <p id="txtRam" class="text-xl font-bold font-mono text-purple-400 mt-1">0%</p>
+                <div class="text-left">
+                    <h2 class="text-xl font-bold text-[var(--text-primary)]">Gaze Calibration</h2>
+                    <p class="text-xs text-[var(--text-muted)]">Calibrating 5-zone gaze model and iris baseline.</p>
                 </div>
             </div>
 
-            <!-- Incident Log Timeline Feed -->
-            <div class="glass-panel rounded-2xl p-5 flex flex-col gap-3 flex-1 min-h-[300px]">
-                <h3 class="text-sm font-bold text-slate-200 tracking-wide uppercase">Live Incident Event Stream</h3>
-                <div id="eventFeedList" class="flex flex-col gap-2 overflow-y-auto max-h-[350px] pr-1">
-                    <p class="text-xs text-slate-500 text-center py-6">Exam session active. Monitoring candidate telemetry...</p>
+            <div class="relative w-56 h-56 rounded-full bg-[var(--light-sand)] border border-[var(--border-color)] flex items-center justify-center shadow-inner my-2">
+                <div id="calibTargetDot" class="w-7 h-7 rounded-full bg-[var(--soft-brown)] shadow-sm transition-all duration-300 flex items-center justify-center text-white font-bold text-xs">
+                    🎯
                 </div>
             </div>
 
-        </section>
-    </main>
+            <div>
+                <h3 id="calibInstructionTitle" class="text-lg font-bold text-[var(--text-primary)]">
+                    Step 1 of 8: Look Straight at Center Target
+                </h3>
+                <p id="calibInstructionDesc" class="text-xs text-[var(--text-muted)] mt-1 max-w-sm">
+                    Focus your gaze directly on the center target dot.
+                </p>
+            </div>
 
-    <!-- Custom JS Scripts -->
+            <div class="w-full max-w-md flex flex-col gap-1.5">
+                <div class="flex justify-between text-xs font-mono text-[var(--text-muted)]">
+                    <span>Progress:</span>
+                    <span id="calibProgressPercent" class="font-bold text-[var(--soft-brown)]">12%</span>
+                </div>
+                <div class="w-full h-2 bg-[var(--light-sand)] rounded-full overflow-hidden border border-[var(--border-color)]">
+                    <div id="calibProgressBar" class="h-full bg-[var(--soft-brown)] rounded-full transition-all duration-300" style="width: 12%;"></div>
+                </div>
+            </div>
+
+            <div class="mt-2 flex gap-4">
+                <button onclick="advanceCalibration()" id="btnCalibNext" class="btn-primary text-xs py-2.5 px-6">
+                    Advance Step →
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- STAGE 6: ENVIRONMENT DIAGNOSTICS CHECK -->
+    <!-- ========================================================= -->
+    <section id="stepEnvironment" class="step-section hidden min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-10">
+        <div class="max-w-3xl w-full flex flex-col gap-6">
+            <div class="text-center flex flex-col items-center gap-2">
+                <div class="w-10 h-10 rounded-xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center text-base font-bold">
+                    5
+                </div>
+                <h2 class="text-2xl font-bold text-[var(--text-primary)]">Environment Check</h2>
+                <p class="text-xs text-[var(--text-muted)]">Verifying lighting, network latency, and camera parameters.</p>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="luxury-card p-4 text-center">
+                    <p class="text-[11px] text-[var(--text-muted)]">Lighting Level</p>
+                    <p class="text-xs font-bold text-[var(--color-success)] mt-1">Excellent</p>
+                </div>
+                <div class="luxury-card p-4 text-center">
+                    <p class="text-[11px] text-[var(--text-muted)]">Network Latency</p>
+                    <p class="text-xs font-bold text-[var(--soft-brown)] mt-1">24 ms (Stable)</p>
+                </div>
+                <div class="luxury-card p-4 text-center">
+                    <p class="text-[11px] text-[var(--text-muted)]">Camera Stream</p>
+                    <p class="text-xs font-bold text-[var(--color-success)] mt-1">HD 720P 30FPS</p>
+                </div>
+                <div class="luxury-card p-4 text-center">
+                    <p class="text-[11px] text-[var(--text-muted)]">Microphone</p>
+                    <p class="text-xs font-bold text-[var(--color-success)] mt-1">Active (-45dB)</p>
+                </div>
+                <div class="luxury-card p-4 text-center">
+                    <p class="text-[11px] text-[var(--text-muted)]">Candidate Single</p>
+                    <p class="text-xs font-bold text-[var(--color-success)] mt-1">Verified</p>
+                </div>
+                <div class="luxury-card p-4 text-center">
+                    <p class="text-[11px] text-[var(--text-muted)]">Mobile Phone AI</p>
+                    <p class="text-xs font-bold text-[var(--color-success)] mt-1">Clear</p>
+                </div>
+            </div>
+
+            <div class="mt-4 flex justify-between items-center">
+                <button onclick="switchStep('stepCalibration')" class="btn-secondary text-xs py-2 px-4">
+                    ← Back
+                </button>
+                <button onclick="startCinematicTransition()" class="btn-primary text-xs py-2.5 px-6">
+                    Enter Exam Workspace →
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- STAGE 7: CINEMATIC LOADING TRANSITION -->
+    <!-- ========================================================= -->
+    <section id="stepLoadingTransition" class="step-section hidden min-h-screen flex flex-col justify-center items-center px-6 py-12 relative z-20 bg-[var(--bg-primary)]">
+        <div class="max-w-sm w-full flex flex-col items-center text-center gap-5">
+            <div class="w-12 h-12 rounded-xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center font-bold text-lg border border-[var(--border-color)]">
+                AI
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-[var(--text-primary)]">Preparing Workspace</h2>
+                <p id="loadingStatusText" class="text-xs font-mono text-[var(--text-muted)] mt-1">
+                    Initializing Camera Stream...
+                </p>
+            </div>
+
+            <div class="w-full h-1.5 bg-[var(--light-sand)] rounded-full overflow-hidden border border-[var(--border-color)]">
+                <div id="loadingProgressBar" class="h-full bg-[var(--soft-brown)] rounded-full transition-all duration-300" style="width: 10%;"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- STAGE 8: ENTERPRISE LIVE DASHBOARD -->
+    <!-- ========================================================= -->
+    <div id="stepDashboard" class="step-section hidden flex flex-col min-h-screen">
+        <!-- Minimal Header -->
+        <header class="border-b border-[var(--border-color)] bg-[var(--card-bg)] sticky top-0 z-50 px-6 py-3 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-[var(--dark-brown)] text-[var(--warm-beige)] flex items-center justify-center font-bold text-sm">
+                    V
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-[var(--text-primary)] leading-none">VerifyAI Platform</h1>
+                    <p id="lblCandidateHeader" class="text-xs text-[var(--text-muted)] mt-0.5">Candidate: Alex Johnson (REG-2026-8941)</p>
+                </div>
+            </div>
+
+            <!-- Timers & Navigation Tools -->
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 bg-[var(--bg-primary)] border border-[var(--border-color)] px-3 py-1 rounded-lg text-xs font-mono">
+                    <span class="text-[var(--text-muted)]">TIMER:</span>
+                    <span id="txtDuration" class="font-bold text-[var(--soft-brown)]">00:00</span>
+                </div>
+
+                <div id="wsStatusBadge" class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-[var(--warm-beige)] text-[var(--dark-brown)]">
+                    Connecting...
+                </div>
+
+                <button onclick="toggleTheme()" class="p-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-xs">
+                    <span id="navThemeIcon">☀️</span>
+                </button>
+            </div>
+
+            <!-- Control Action Toolbar -->
+            <div class="flex items-center gap-2">
+                <button id="btnMuteAlarm" class="btn-secondary text-xs py-1 px-3">🔊 Mute</button>
+                <button id="btnStart" class="btn-primary text-xs py-1 px-3">▶ Start</button>
+                <button id="btnPause" class="btn-secondary text-xs py-1 px-3">⏸ Pause</button>
+                <button id="btnResume" class="btn-secondary text-xs py-1 px-3">⏯ Resume</button>
+                <button id="btnResetRisk" class="btn-secondary text-xs py-1 px-3 text-[var(--color-critical)] border-[var(--color-critical)]">🔄 Reset</button>
+                <a href="/report" target="_blank" class="btn-primary text-xs py-1 px-3">📄 Report</a>
+            </div>
+        </header>
+
+        <!-- Danger Banner -->
+        <div id="dangerBanner" class="hidden bg-[var(--color-critical)] text-white px-6 py-2.5 font-bold text-center text-xs tracking-wide flex items-center justify-center gap-2">
+            <span>🚨</span>
+            <span id="dangerMessage">DANGER ALERT: CELL PHONE DETECTED!</span>
+        </div>
+
+        <!-- Main Dashboard Content Grid -->
+        <main class="flex-1 p-6 grid grid-cols-12 gap-6 max-w-[1920px] mx-auto w-full">
+            <!-- Left Column: Video Feed & Subsystems (7 Cols) -->
+            <section class="col-span-12 lg:col-span-7 flex flex-col gap-5">
+
+                <!-- Person & Position Monitor Banner -->
+                <div id="personDetectionBanner" class="luxury-card p-3 flex items-center justify-between px-4">
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="w-2 h-2 rounded-full bg-[var(--color-success)]"></span>
+                        <span class="font-medium text-[var(--text-muted)]">Position Status:</span>
+                        <span id="txtPositionStatus" class="font-bold text-[var(--color-success)]">Candidate Verified</span>
+                    </div>
+                    <span id="txtLightingStatus" class="text-[11px] font-mono text-[var(--text-muted)]">Lighting: Optimal (84%)</span>
+                </div>
+
+                <!-- Centered Large Camera Container -->
+                <div id="playerBox" class="luxury-card p-3 flex flex-col relative overflow-hidden">
+                    <div id="cameraStageBox" class="camera-stage-container active-camera">
+                        <!-- LAYER 1: VIDEO STREAM -->
+                        <video id="webcamElement" autoplay playsinline muted class="camera-layer-video hidden"></video>
+                        <img id="videoFeedStream" src="/video_feed" alt="Live Stream" class="camera-layer-video">
+
+                        <!-- LAYER 2: CANVAS OVERLAY -->
+                        <canvas id="cameraOverlayCanvas" class="camera-layer-canvas"></canvas>
+
+                        <!-- LAYER 3: HUD OVERLAY -->
+                        <div class="camera-layer-hud">
+                            <!-- HUD Top -->
+                            <div class="flex justify-between items-start text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded bg-black/60 text-white font-medium text-[10px]">🔴 REC</span>
+                                    <span id="hudTimestamp" class="px-2 py-0.5 rounded bg-black/60 text-slate-200 font-mono text-[10px]">2026-07-29 13:45:00</span>
+                                </div>
+                                <span id="hudLatency" class="px-2 py-0.5 rounded bg-black/60 text-[var(--muted-gold)] font-mono text-[10px]">18 ms</span>
+                            </div>
+
+                            <!-- HUD Waiting Empty State Overlay -->
+                            <div class="flex items-center justify-center pointer-events-none">
+                                <div id="hudNoCandidate" class="hidden font-semibold text-xs text-[var(--dark-brown)] bg-[var(--warm-beige)] px-4 py-2 rounded-xl shadow-md flex items-center gap-2">
+                                    <span>⌛</span> Waiting for candidate...
+                                </div>
+                            </div>
+
+                            <!-- HUD Bottom Stats -->
+                            <div class="flex justify-between items-end text-[10px] font-mono text-slate-200">
+                                <div class="flex items-center gap-2">
+                                    <span id="hudRes" class="px-1.5 py-0.5 rounded bg-black/60">1280x720</span>
+                                    <span id="hudFps" class="px-1.5 py-0.5 rounded bg-black/60 text-emerald-400 font-bold">30.0 FPS</span>
+                                </div>
+                                <span id="hudCamStatus" class="px-1.5 py-0.5 rounded bg-black/60 text-emerald-400 font-bold">STREAMING</span>
+                            </div>
+
+                            <!-- Camera Loading Overlay -->
+                            <div id="cameraLoadingState" class="hidden absolute inset-0 bg-[var(--card-bg)] z-30 flex flex-col items-center justify-center gap-2">
+                                <div class="w-8 h-8 rounded-full border-2 border-[var(--muted-gold)] border-t-transparent animate-spin"></div>
+                                <p class="text-xs text-[var(--text-muted)] font-medium">Initializing Camera Stream...</p>
+                            </div>
+
+                            <!-- Camera Diagnostic Error Overlay Card -->
+                            <div id="cameraErrorState" class="hidden absolute inset-0 bg-[var(--card-bg)] z-30 flex flex-col items-center justify-center p-6 text-center gap-3">
+                                <div class="w-12 h-12 rounded-2xl bg-[var(--warm-beige)] text-[var(--dark-brown)] flex items-center justify-center text-xl font-bold">📷</div>
+                                <h3 id="cameraErrorTitle" class="text-sm font-bold text-[var(--text-primary)]">Camera Stream Interrupted</h3>
+                                <p id="cameraErrorDesc" class="text-xs text-[var(--text-muted)] max-w-sm">No video frames received from your camera device.</p>
+                                <button id="cameraErrorAction" onclick="initCameraStream(true)" class="btn-primary text-xs py-2 px-5">🔄 Reconnect Camera</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Under Video Pills -->
+                    <div class="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
+                        <div class="bg-[var(--bg-primary)] p-2 rounded-xl border border-[var(--border-color)]">
+                            <p class="text-[10px] text-[var(--text-muted)]">Face Status</p>
+                            <span id="pillFace" class="font-bold text-[var(--color-success)] text-[11px]">Verified</span>
+                        </div>
+                        <div class="bg-[var(--bg-primary)] p-2 rounded-xl border border-[var(--border-color)]">
+                            <p class="text-[10px] text-[var(--text-muted)]">Multi-Face</p>
+                            <span id="pillMultiFace" class="font-bold text-[var(--color-success)] text-[11px]">Single</span>
+                        </div>
+                        <div class="bg-[var(--bg-primary)] p-2 rounded-xl border border-[var(--border-color)]">
+                            <p class="text-[10px] text-[var(--text-muted)]">Mobile Phone</p>
+                            <span id="pillPhone" class="font-bold text-[var(--color-success)] text-[11px]">Clear</span>
+                        </div>
+                        <div class="bg-[var(--bg-primary)] p-2 rounded-xl border border-[var(--border-color)]">
+                            <p class="text-[10px] text-[var(--text-muted)]">Head Pose</p>
+                            <span id="pillHeadTurn" class="font-bold text-[var(--color-success)] text-[11px]">Centered</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gaze Telemetry -->
+                <div class="luxury-card p-5 flex flex-col gap-3">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-bold text-[var(--text-primary)]">Gaze Telemetry</span>
+                        <span id="txtGazeDir" class="font-mono font-bold text-[var(--soft-brown)]">CENTER</span>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span id="pillLeft" class="px-2.5 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-muted)]">LOOKING LEFT</span>
+                        <span id="pillRight" class="px-2.5 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-muted)]">LOOKING RIGHT</span>
+                        <span id="pillUp" class="px-2.5 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-muted)]">LOOKING UP</span>
+                        <span id="pillDown" class="px-2.5 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-muted)]">LOOKING DOWN</span>
+                        <span id="pillOffscreen" class="px-2.5 py-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-muted)]">OFFSCREEN GAZE</span>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Right Column: Risk Engine, Explainability & Timeline (5 Cols) -->
+            <section class="col-span-12 lg:col-span-5 flex flex-col gap-5">
+
+                <!-- Risk Engine Card -->
+                <div class="luxury-card p-6 flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">Behavioral Risk Engine</h2>
+                        <span id="txtSeverityBadge" class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-[var(--warm-beige)] text-[var(--color-success)]">Safe (0-20%)</span>
+                    </div>
+
+                    <div class="flex items-baseline justify-between mt-1">
+                        <span id="txtRiskScore" class="text-4xl font-extrabold font-mono text-[var(--text-primary)]">0.0%</span>
+                        <span id="txtPeakRisk" class="text-xs font-mono text-[var(--text-muted)]">Peak: 0.0%</span>
+                    </div>
+
+                    <div class="w-full h-2.5 bg-[var(--bg-primary)] rounded-full overflow-hidden border border-[var(--border-color)]">
+                        <div id="riskProgressBar" class="h-full rounded-full transition-all duration-300 bg-[var(--color-success)]" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- AI Explainability Panel -->
+                <div class="luxury-card p-5 flex flex-col gap-3 text-xs">
+                    <h3 class="font-bold text-[var(--text-primary)]">AI Risk Breakdown</h3>
+                    <div id="explainabilityList" class="flex flex-col gap-2 font-mono">
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                            <span class="text-[var(--text-muted)]">Baseline Score</span>
+                            <span class="font-bold text-[var(--color-success)]">+0</span>
+                        </div>
+                        <div id="explainPhone" class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--color-critical)] hidden">
+                            <span class="text-[var(--color-critical)]">Phone Detected</span>
+                            <span class="font-bold text-[var(--color-critical)]">+30</span>
+                        </div>
+                        <div id="explainGaze" class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--color-warning)] hidden">
+                            <span class="text-[var(--color-warning)]">Offscreen Gaze</span>
+                            <span class="font-bold text-[var(--color-warning)]">+5</span>
+                        </div>
+                        <div id="explainMultiFace" class="flex justify-between items-center p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--color-critical)] hidden">
+                            <span class="text-[var(--color-critical)]">Multiple Faces</span>
+                            <span class="font-bold text-[var(--color-critical)]">+25</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 rounded-lg bg-[var(--warm-beige)] font-bold text-[var(--dark-brown)]">
+                            <span>Total Cumulative Risk</span>
+                            <span id="txtExplainTotal">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Risk Chart -->
+                <div class="luxury-card p-5 flex flex-col gap-3">
+                    <h3 class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Live Risk Trend</h3>
+                    <div class="w-full h-36">
+                        <canvas id="riskChartCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Timeline Stream -->
+                <div class="luxury-card p-5 flex flex-col gap-3 flex-1 min-h-[220px]">
+                    <h3 class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Recent Incidents</h3>
+                    <div id="eventFeedList" class="flex flex-col gap-2 overflow-y-auto max-h-[260px] pr-1">
+                        <p class="text-xs text-[var(--text-muted)] text-center py-6">Session active. Monitoring telemetry...</p>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Custom Frontend Application Scripts -->
     <script src="/js/websocket.js"></script>
     <script src="/js/charts.js"></script>
     <script src="/js/dashboard.js"></script>
