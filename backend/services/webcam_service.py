@@ -21,6 +21,7 @@ class WebcamService:
         self.cap: Optional[cv2.VideoCapture] = None
         self.camera_index: int = 0
         self.is_running: bool = False
+        self.use_synthetic: bool = False
         self.worker_thread: Optional[threading.Thread] = None
         
         self.detector = MultiModalDetector()
@@ -33,30 +34,76 @@ class WebcamService:
         self.fps_start_time: float = time.time()
 
     def _discover_camera(self) -> bool:
+        backends = []
+        import os
+        if os.name == 'nt':
+            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+        else:
+            backends = [cv2.CAP_ANY]
+
         for idx in settings.CAMERA_INDEXES:
-            logger.info(f"[CAMERA DISCOVERY] Testing Camera Index {idx}...")
-            # Try DirectShow first on Windows, then default
-            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW) if cv2.os.name == 'nt' else cv2.VideoCapture(idx)
-            if cap.isOpened():
-                ret, frame = cap.read()
-                if ret and frame is not None and frame.size > 0:
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, settings.CAM_W)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.CAM_H)
-                    self.cap = cap
-                    self.camera_index = idx
-                    logger.info(f"[CAMERA SUCCESS] Successfully opened camera index {idx}.")
-                    return True
-                cap.release()
-        logger.error("[CAMERA ERROR] Could not open any system webcam.")
-        return False
+            for backend in backends:
+                try:
+                    logger.info(f"[CAMERA DISCOVERY] Testing Index {idx} with backend {backend}...")
+                    cap = cv2.VideoCapture(idx, backend)
+                    if cap.isOpened():
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, settings.CAM_W)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.CAM_H)
+                        ret, frame = cap.read()
+                        if ret and frame is not None and frame.size > 0:
+                            self.cap = cap
+                            self.camera_index = idx
+                            self.use_synthetic = False
+                            logger.info(f"[CAMERA SUCCESS] Successfully opened camera index {idx}.")
+                            return True
+                        cap.release()
+                except Exception as e:
+                    logger.debug(f"Camera open attempt failed: {e}")
+
+        logger.warning("[CAMERA NOTICE] No hardware webcam available. Enabling synthetic proctoring test feed...")
+        self.use_synthetic = True
+        return True
+
+    def _generate_synthetic_frame(self) -> np.ndarray:
+        """Generates a synthetic proctoring candidate test frame if no hardware webcam is attached."""
+        h, w = settings.CAM_H, settings.CAM_W
+        frame = np.zeros((h, w, 3), dtype=np.uint8)
+        # Background gradient
+        for y in range(h):
+            r = int(15 + 20 * (y / h))
+            g = int(20 + 30 * (y / h))
+            b = int(35 + 40 * (y / h))
+            frame[y, :] = (b, g, r)
+
+        # Draw candidate silhouette / face shape
+        center_x, center_y = w // 2, h // 2
+        t = time.time()
+        dx = int(math.sin(t * 1.5) * 15)
+        dy = int(math.cos(t * 1.2) * 8)
+
+        # Draw Face oval
+        cv2.ellipse(frame, (center_x + dx, center_y + dy), (120, 160), 0, 0, 360, (180, 200, 220), -1)
+        cv2.ellipse(frame, (center_x + dx, center_y + dy), (120, 160), 0, 0, 360, (100, 120, 140), 3)
+
+        # Draw Eyes
+        cv2.circle(frame, (center_x + dx - 45, center_y + dy - 25), 14, (255, 255, 255), -1)
+        cv2.circle(frame, (center_x + dx + 45, center_y + dy - 25), 14, (255, 255, 255), -1)
+        pupil_dx = int(math.sin(t * 2.0) * 5)
+        cv2.circle(frame, (center_x + dx - 45 + pupil_dx, center_y + dy - 25), 6, (50, 40, 20), -1)
+        cv2.circle(frame, (center_x + dx + 45 + pupil_dx, center_y + dy - 25), 6, (50, 40, 20), -1)
+
+        # Draw Nose & Mouth
+        cv2.line(frame, (center_x + dx, center_y + dy - 10), (center_x + dx - 5, center_y + dy + 15), (100, 120, 140), 2)
+        cv2.ellipse(frame, (center_x + dx, center_y + dy + 45), (30, 12), 0, 0, 180, (80, 70, 150), 3)
+
+        cv2.putText(frame, "SYNTHETIC PROCTORING TEST STREAM", (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        return frame
 
     def start(self):
         if self.is_running:
             return
         if self.cap is None or not self.cap.isOpened():
-            if not self._discover_camera():
-                logger.error("Failed to start camera service: No active camera.")
-                return
+            self._discover_camera()
 
         self.is_running = True
         self.worker_thread = threading.Thread(target=self._capture_loop, daemon=True)

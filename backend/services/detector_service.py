@@ -124,11 +124,13 @@ class ObjectDetectorService:
             except Exception as e:
                 logger.warning(f"[OBJECT DETECTOR] Could not load Caffe model: {e}")
 
-    def detect_objects(self, frame: np.ndarray) -> List[Dict[str, Any]]:
+    def detect_objects(self, frame: np.ndarray, hand_boxes: List[Tuple[int, int, int, int]] = None) -> List[Dict[str, Any]]:
         if frame is None:
             return []
         h, w = frame.shape[:2]
         raw_detections = []
+
+        # 1. DNN Object Detection (MobileNet-SSD)
         if self.net is not None:
             try:
                 blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
@@ -138,12 +140,16 @@ class ObjectDetectorService:
                     confidence = float(out[0, 0, i, 2])
                     if confidence >= settings.OBJECT_CONF_THRESHOLD:
                         idx = int(out[0, 0, i, 1])
-                        if idx in [15, 67, 73, 63, 65, 77] or idx == 20:
+                        # Detect TV/monitor (class 20 in VOC), person (15), or cell phone (67, 77 in COCO)
+                        if idx in [15, 20, 67, 73, 63, 65, 77]:
                             box = out[0, 0, i, 3:7] * np.array([w, h, w, h])
                             startX, startY, endX, endY = box.astype("int")
                             bw = max(1, endX - startX)
                             bh = max(1, endY - startY)
                             if bw > w * 0.65 or bh > h * 0.65:
+                                continue
+                            # If class is person (15), only include if small rectangular aspect near hands
+                            if idx == 15 and not (1.3 <= bh / max(1, bw) <= 2.8 or 0.35 <= bh / max(1, bw) <= 0.75):
                                 continue
                             raw_detections.append({
                                 "box": (startX, startY, bw, bh),
@@ -153,32 +159,43 @@ class ObjectDetectorService:
             except Exception as e:
                 logger.debug(f"Object detection error: {e}")
 
-        # Contour fallback if no DNN detection
+        # 2. Handheld Rectangular Contour Fallback Detection
         if not raw_detections:
             try:
                 small = cv2.resize(frame, (320, 180))
                 gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-                blur = cv2.GaussianBlur(gray, (3, 3), 0)
-                _, thresh = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+                blur = cv2.GaussianBlur(gray, (5, 5), 0)
+                _, thresh = cv2.threshold(blur, 55, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
                 contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 scale_x, scale_y = w / 320.0, h / 180.0
+                
                 for c in contours:
                     area = cv2.contourArea(c)
-                    if 150 < area < 4500:
+                    if 180 < area < 6500:
                         x, y, cw, ch = cv2.boundingRect(c)
                         aspect = float(ch) / max(1, cw)
-                        if (1.4 <= aspect <= 2.5 or 0.4 <= aspect <= 0.7):
-                            rect_area = cw * ch
-                            extent = float(area) / rect_area
-                            if extent > 0.72:
-                                real_x, real_y = int(x * scale_x), int(y * scale_y)
-                                real_w, real_h = int(cw * scale_x), int(ch * scale_y)
-                                raw_detections.append({
-                                    "box": (real_x, real_y, real_w, real_h),
-                                    "label": "cell phone",
-                                    "confidence": 0.85
-                                })
-                                break
+                        rect_area = cw * ch
+                        extent = float(area) / max(1.0, rect_area)
+                        
+                        # Typical phone aspect ratio ranges (portrait 1.4-2.8, landscape 0.35-0.7)
+                        if (1.35 <= aspect <= 2.8 or 0.35 <= aspect <= 0.72) and extent > 0.70:
+                            real_x, real_y = int(x * scale_x), int(y * scale_y)
+                            real_w, real_h = int(cw * scale_x), int(ch * scale_y)
+                            
+                            # Check if contour overlaps or sits near hands if available
+                            conf = 0.82
+                            if hand_boxes:
+                                for hx, hy, hw, hh in hand_boxes:
+                                    if compute_iou((real_x, real_y, real_w, real_h), (hx, hy, hw, hh)) > 0.05:
+                                        conf = 0.92
+                                        break
+                                        
+                            raw_detections.append({
+                                "box": (real_x, real_y, real_w, real_h),
+                                "label": "cell phone",
+                                "confidence": conf
+                            })
+                            break
             except Exception:
                 pass
 
@@ -206,8 +223,8 @@ class MultiModalDetector:
 
     def process_frame(self, frame: np.ndarray, now: float) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
-        Process frame through MediaPipe Face Mesh, Head Pose solvePnP, Gaze Tracker, and Object Detector.
-        Annotates frame with HUD bounding boxes and returns telemetry dictionary.
+        Process frame through MediaPipe Face Mesh, Head Pose solvePnP, Gaze Tracker, Facial Expression, and Object Detector.
+        Annotates frame with HUD overlays and returns comprehensive telemetry dictionary.
         """
         if frame is None or frame.size == 0:
             return frame, {}
@@ -216,6 +233,22 @@ class MultiModalDetector:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         mesh_res = self.face_mesh.process(rgb)
+        
+        # Hand tracking
+        hand_boxes = []
+        if self.hands is not None:
+            try:
+                hand_res = self.hands.process(rgb)
+                if hand_res and hand_res.multi_hand_landmarks:
+                    for h_lm in hand_res.multi_hand_landmarks:
+                        h_pts = np.array([(int(l.x * w), int(l.y * h)) for l in h_lm.landmark])
+                        min_x, min_y = h_pts.min(axis=0)
+                        max_x, max_y = h_pts.max(axis=0)
+                        hand_boxes.append((int(min_x), int(min_y), int(max_x - min_x), int(max_y - min_y)))
+                        # Draw hand outline
+                        cv2.rectangle(frame, (min_x, min_y), (max_x, max_y), (255, 165, 0), 1)
+            except Exception:
+                pass
 
         face_detected = False
         multiface = False
@@ -223,12 +256,19 @@ class MultiModalDetector:
         headturn, fullturn, lap_glance = False, False, False
         head_status = "NORMAL"
         pitch, yaw, roll = 0.0, 0.0, 0.0
-        axis_pts = None
+
+        # Facial Expression Telemetry
+        expression = "NEUTRAL"
+        mar = 0.0
+        talking = False
+        yawning = False
+        smiling = False
 
         gaze_telemetry = {
             "gaze_direction": "CENTER", "looking_left": False, "looking_right": False,
             "looking_up": False, "looking_down": False, "offscreen": False, "rapid_scan": False,
-            "dx": 0.0, "dy": 0.0, "ear": 0.3, "eyes_closed": False, "blink_count": 0
+            "dx": 0.0, "dy": 0.0, "ear": 0.3, "eyes_closed": False, "blink_count": 0,
+            "Lc": (0, 0), "Rc": (0, 0)
         }
 
         if mesh_res and mesh_res.multi_face_landmarks:
@@ -243,8 +283,48 @@ class MultiModalDetector:
 
             # 1. Gaze Tracking
             gaze_telemetry = self.gaze_service.process(lm_px, now)
+            
+            # Draw Pupil Crosshairs on Frame
+            Lc = gaze_telemetry.get("Lc", (0, 0))
+            Rc = gaze_telemetry.get("Rc", (0, 0))
+            if Lc[0] > 0 and Lc[1] > 0:
+                cv2.circle(frame, Lc, 3, (255, 255, 0), -1)
+            if Rc[0] > 0 and Rc[1] > 0:
+                cv2.circle(frame, Rc, 3, (255, 255, 0), -1)
 
-            # 2. 3D Head Pose solvePnP Estimation
+            # 2. Facial Expression Analysis (Mouth Aspect Ratio & Smile Ratio)
+            try:
+                top_lip = lm_px[13]
+                bot_lip = lm_px[14]
+                l_mouth = lm_px[61]
+                r_mouth = lm_px[291]
+                nose = lm_px[1]
+                chin = lm_px[152]
+
+                mouth_h = float(np.linalg.norm(top_lip - bot_lip))
+                mouth_w = float(np.linalg.norm(l_mouth - r_mouth))
+                face_h = float(np.linalg.norm(nose - chin))
+
+                mar = round(mouth_h / max(1.0, mouth_w), 2)
+                smile_ratio = round(mouth_w / max(1.0, face_h), 2)
+
+                if mar > 0.45:
+                    expression = "YAWNING / MOUTH OPEN"
+                    yawning = True
+                elif mar > 0.22:
+                    expression = "TALKING / SPEAKING"
+                    talking = True
+                elif smile_ratio > 0.45:
+                    expression = "SMILING"
+                    smiling = True
+
+                # Draw Lip Contour HUD
+                cv2.line(frame, tuple(top_lip), tuple(bot_lip), (0, 255, 0) if not talking else (0, 165, 255), 2)
+                cv2.line(frame, tuple(l_mouth), tuple(r_mouth), (0, 255, 0) if not smiling else (255, 0, 255), 2)
+            except Exception:
+                pass
+
+            # 3. 3D Head Pose solvePnP Estimation
             try:
                 img_pts = np.array([tuple(lm_px[i]) for i in HP_IDX], dtype=np.float64)
                 focal_length = w
@@ -280,20 +360,24 @@ class MultiModalDetector:
                     nose_end_2d, _ = cv2.projectPoints(nose_end_3d, rvec, tvec, cam_matrix, dist_coeffs)
                     p1 = (int(img_pts[0][0]), int(img_pts[0][1]))
                     p2 = (int(nose_end_2d[0][0][0]), int(nose_end_2d[0][0][1]))
-                    axis_pts = (p1, p2)
                     cv2.arrowedLine(frame, p1, p2, (0, 255, 255), 2, cv2.LINE_AA, tipLength=0.2)
             except Exception:
                 pass
 
-        # 3. Object Detection (Cell Phone)
+        # 4. Object Detection (Cell Phone)
         phone_detected = False
-        detected_objects = self.object_detector.detect_objects(frame)
+        detected_objects = self.object_detector.detect_objects(frame, hand_boxes=hand_boxes)
         if detected_objects:
             phone_detected = True
             for det in detected_objects:
                 x, y, bw, bh = det["box"]
-                cv2.rectangle(frame, (x, y), (x + bw, y + bh), (0, 0, 255), 2)
-                cv2.putText(frame, f"CELL PHONE {int(det['confidence']*100)}%", (x, max(20, y - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                cv2.rectangle(frame, (x, y), (x + bw, y + bh), (0, 0, 255), 3)
+                cv2.rectangle(frame, (x, max(0, y - 25)), (x + bw, y), (0, 0, 255), -1)
+                cv2.putText(frame, f"CELL PHONE {int(det['confidence']*100)}%", (x + 5, max(15, y - 7)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+        # 5. Top HUD Banner Annotations
+        cv2.putText(frame, f"GAZE: {gaze_telemetry['gaze_direction']}", (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv2.putText(frame, f"EXPRESSION: {expression}", (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if expression == "NEUTRAL" else (0, 165, 255), 2)
 
         telemetry = {
             "face_detected": face_detected,
@@ -315,7 +399,13 @@ class MultiModalDetector:
             "pitch": round(pitch, 1),
             "yaw": round(yaw, 1),
             "roll": round(roll, 1),
+            "expression": expression,
+            "mar": mar,
+            "talking": talking,
+            "yawning": yawning,
+            "smiling": smiling,
             "phone_detected": phone_detected
         }
 
         return frame, telemetry
+
