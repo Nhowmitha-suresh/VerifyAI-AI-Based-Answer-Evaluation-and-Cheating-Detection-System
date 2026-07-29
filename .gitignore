@@ -32,6 +32,12 @@ ENV/
 node_modules/
 package-lock.json
 
+# Runtime Artifacts & Evidence
+snapshots/
+reports/
+proctor_log.csv
+proctor_report.html
+
 # IDEs
 .vscode/
 .idea/
