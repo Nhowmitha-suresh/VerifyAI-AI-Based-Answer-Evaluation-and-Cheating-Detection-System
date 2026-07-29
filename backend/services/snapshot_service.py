@@ -15,7 +15,9 @@ from backend.utils.filesystem import get_today_snapshot_dir, generate_timestamp_
 
 class SnapshotService:
     @staticmethod
-    def capture_snapshot(frame: np.ndarray, reason: str = "manual") -> Optional[Dict[str, Any]]:
+    def capture_snapshot(frame: np.ndarray, reason: str = "manual", force: bool = False) -> Optional[Dict[str, Any]]:
+        if not getattr(settings, "ENABLE_SNAPSHOTS", False) and not force:
+            return None
         if frame is None or frame.size == 0:
             return None
 
